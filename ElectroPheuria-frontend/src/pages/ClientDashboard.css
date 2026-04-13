@@ -1,0 +1,48 @@
+/* src/pages/ClientDashboard.css */
+.client-dashboard {
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 90px 2rem 2rem;
+}
+
+.client-header {
+  text-align: center;
+  margin-bottom: 2rem;
+}
+
+.client-header h1 {
+  color: #D4AF37;
+  font-size: 2.5rem;
+}
+
+.client-stats {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 1rem;
+  margin-bottom: 2rem;
+}
+
+.stat-card {
+  background: white;
+  padding: 1.5rem;
+  border-radius: 10px;
+  box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+  text-align: center;
+}
+
+.client-orders table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.client-orders th, .client-orders td {
+  padding: 1rem;
+  text-align: left;
+  border-bottom: 1px solid #eee;
+}
+
+.loading, .error {
+  text-align: center;
+  padding: 2rem;
+}
+

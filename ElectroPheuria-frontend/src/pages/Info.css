@@ -1,0 +1,109 @@
+/* Info.css */
+@import url('https://fonts.googleapis.com/css2?family=Montserrat:wght@400;600;700&family=Poppins:wght@300;400;500;600&display=swap');
+
+.info-main {
+  max-width: 900px;
+  margin: 0 auto;
+  padding: 100px 30px 80px;
+  font-family: 'Poppins', sans-serif;
+  color: #e0e0e0;
+  min-height: 100vh;
+}
+
+.info-section {
+  margin-bottom: 60px;
+}
+
+.info-title {
+  font-family: 'Montserrat', sans-serif;
+  font-size: 2rem;
+  font-weight: 800;
+  background: linear-gradient(135deg, var(--gold-main, #D4AF37), var(--gold-light, #FFD700));
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+  margin-bottom: 25px;
+  position: relative;
+  display: inline-block;
+}
+
+.info-title::after {
+  content: '';
+  display: block;
+  width: 60px;
+  height: 3px;
+  background: linear-gradient(90deg, var(--gold-main, #D4AF37), var(--gold-light, #FFD700));
+  margin-top: 10px;
+  border-radius: 2px;
+}
+
+.info-cards {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 18px;
+}
+
+.info-card {
+  background: linear-gradient(145deg, rgba(26, 26, 26, 0.95), rgba(15, 15, 15, 0.98));
+  border: 1px solid rgba(212, 175, 55, 0.2);
+  border-radius: 16px;
+  padding: 22px;
+  transition: all 0.3s ease;
+}
+
+.info-card:hover {
+  border-color: var(--gold-main, #D4AF37);
+  box-shadow: 0 8px 25px rgba(212, 175, 55, 0.15);
+  transform: translateY(-3px);
+}
+
+.info-card h4 {
+  color: var(--gold-main, #D4AF37);
+  font-size: 1rem;
+  font-weight: 600;
+  margin: 0 0 10px;
+}
+
+.info-card p {
+  color: #bbb;
+  font-size: 0.9rem;
+  line-height: 1.6;
+  margin: 0;
+}
+
+.info-content-box {
+  background: linear-gradient(145deg, rgba(26, 26, 26, 0.95), rgba(15, 15, 15, 0.98));
+  border: 1px solid rgba(212, 175, 55, 0.2);
+  border-radius: 16px;
+  padding: 28px;
+}
+
+.info-content-box p {
+  color: #bbb;
+  font-size: 0.95rem;
+  line-height: 1.7;
+  margin: 0 0 14px;
+}
+
+.info-content-box p:last-child {
+  margin-bottom: 0;
+}
+
+@media (max-width: 768px) {
+  .info-main {
+    padding: 90px 18px 50px;
+  }
+
+  .info-title {
+    font-size: 1.5rem;
+  }
+
+  .info-cards {
+    grid-template-columns: 1fr;
+    gap: 12px;
+  }
+
+  .info-content-box {
+    padding: 20px;
+  }
+}

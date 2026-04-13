@@ -1,0 +1,240 @@
+/* SalesHistory — Clean Admin */
+
+.sales-container {
+  min-height: 100vh;
+  background: var(--bg-primary, #111113);
+  color: var(--text-primary, #e4e4e7);
+  font-family: 'Inter', -apple-system, sans-serif;
+  padding: 110px 24px 24px;
+}
+
+.gold-text {
+  color: var(--accent, #D4AF37);
+  font-size: 1.5rem;
+  font-weight: 700;
+  margin-bottom: 4px;
+}
+
+.sales-header {
+  margin-bottom: 24px;
+  text-align: center;
+}
+
+.sales-header p {
+  font-size: 0.8125rem;
+  color: var(--text-secondary, #a1a1aa);
+}
+
+/* Calendar Section */
+.sales-calendar-section {
+  margin-bottom: 24px;
+}
+
+.year-selector {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 16px;
+  margin-bottom: 16px;
+}
+
+.year-label {
+  font-size: 1.3rem;
+  font-weight: 700;
+  color: var(--accent, #D4AF37);
+  min-width: 60px;
+  text-align: center;
+}
+
+.year-btn {
+  background: var(--bg-card, #1e1e21);
+  border: 1px solid var(--border, rgba(255,255,255,0.08));
+  color: var(--text-primary, #e4e4e7);
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  cursor: pointer;
+  font-size: 1rem;
+  font-weight: 600;
+  transition: all 0.2s ease;
+}
+
+.year-btn:hover:not(:disabled) {
+  border-color: var(--accent, #D4AF37);
+  color: var(--accent, #D4AF37);
+}
+
+.year-btn:disabled {
+  opacity: 0.3;
+  cursor: not-allowed;
+}
+
+.months-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 10px;
+}
+
+.month-card {
+  background: var(--bg-card, #1e1e21);
+  border: 1px solid var(--border, rgba(255,255,255,0.08));
+  border-radius: 10px;
+  padding: 14px 10px;
+  text-align: center;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.month-card:hover {
+  border-color: var(--border-accent, rgba(212,175,55,0.3));
+  transform: translateY(-2px);
+}
+
+.month-card.selected {
+  border-color: var(--accent, #D4AF37);
+  background: rgba(212, 175, 55, 0.1);
+  box-shadow: 0 0 12px rgba(212, 175, 55, 0.15);
+}
+
+.month-card.has-sales .month-amount {
+  color: var(--accent, #D4AF37);
+}
+
+.month-name {
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: var(--text-secondary, #a1a1aa);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.month-amount {
+  font-size: 0.95rem;
+  font-weight: 700;
+  color: var(--text-primary, #e4e4e7);
+}
+
+.month-orders {
+  font-size: 0.7rem;
+  color: var(--text-secondary, #a1a1aa);
+}
+
+.year-total {
+  text-align: center;
+  margin-top: 14px;
+  font-size: 0.9rem;
+  color: var(--text-secondary, #a1a1aa);
+}
+
+.year-total strong {
+  color: var(--accent, #D4AF37);
+  font-size: 1.05rem;
+}
+
+/* Summary Cards */
+.sales-summary {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 16px;
+  margin-bottom: 24px;
+}
+
+.summary-card {
+  background: var(--bg-card, #1e1e21);
+  border-radius: var(--radius-lg, 10px);
+  padding: 20px;
+  text-align: center;
+  border: 1px solid var(--border, rgba(255,255,255,0.08));
+  transition: border-color 0.15s ease;
+}
+
+.summary-card:hover {
+  border-color: var(--border-accent, rgba(212,175,55,0.2));
+}
+
+.summary-card h3 {
+  font-size: 0.75rem;
+  margin-bottom: 8px;
+  color: var(--text-secondary, #a1a1aa);
+  font-weight: 500;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.summary-number {
+  font-size: 1.5rem;
+  font-weight: 700;
+  color: var(--text-primary, #e4e4e7);
+}
+
+/* Table */
+.sales-table-container {
+  background: var(--bg-card, #1e1e21);
+  border-radius: var(--radius-lg, 10px);
+  padding: 0;
+  border: 1px solid var(--border, rgba(255,255,255,0.08));
+  overflow-x: auto;
+}
+
+.sales-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.875rem;
+}
+
+.sales-table th {
+  background: var(--bg-elevated, #252529);
+  color: var(--text-secondary, #a1a1aa);
+  padding: 10px 16px;
+  text-align: left;
+  font-weight: 600;
+  font-size: 0.75rem;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  border-bottom: 1px solid var(--border, rgba(255,255,255,0.08));
+}
+
+.sales-table td {
+  padding: 10px 16px;
+  border-bottom: 1px solid var(--border, rgba(255,255,255,0.08));
+}
+
+.sale-row {
+  transition: background 0.1s ease;
+}
+
+.sale-row:hover {
+  background: rgba(255, 255, 255, 0.02);
+}
+
+.price-amount {
+  font-weight: 600;
+  color: var(--accent, #D4AF37);
+}
+
+/* Responsive */
+@media (max-width: 768px) {
+  .sales-container {
+    padding: 110px 16px 16px;
+  }
+  .sales-summary {
+    grid-template-columns: 1fr 1fr;
+  }
+  .months-grid {
+    grid-template-columns: repeat(3, 1fr);
+    gap: 8px;
+  }
+  .month-card {
+    padding: 10px 6px;
+  }
+  .month-amount {
+    font-size: 0.8rem;
+  }
+  .sales-table th, .sales-table td {
+    padding: 8px 10px;
+    font-size: 0.8rem;
+  }
+}

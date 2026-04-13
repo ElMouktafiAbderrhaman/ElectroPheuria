@@ -1,0 +1,200 @@
+/* Global Styles */
+@import url('https://fonts.googleapis.com/css2?family=Cairo:wght@300;400;500;600;700&display=swap');
+
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+html {
+  scroll-behavior: smooth;
+  scroll-padding-top: 80px;
+}
+
+html, body {
+  overflow-x: hidden;
+  max-width: 100vw;
+  transition: background-color 0.4s cubic-bezier(0.4, 0, 0.2, 1), color 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+:root {
+  /* Dark Mode Defaults */
+--bg-primary: #000000;
+--bg-secondary: #000000;
+  --bg-card: #1a1a1a;
+  --bg-dark: #2d2d2d;
+  --text-primary: #e8e8e8;
+  --text-secondary: #b8b8b8;
+  --text-muted: #888888;
+  --border-color: rgba(212, 175, 55, 0.2);
+  --shadow-color: rgba(0,0,0,0.5);
+  --gold-main: #D4AF37;
+  --gold-light: #FFE066;
+  --dark-card-gradient: linear-gradient(145deg, #1a1a1a, #0f0f0f);
+  --dark-hero-gradient: linear-gradient(135deg, #0f0f0f, #1a1a1a, #111);
+  --overlay-dark: linear-gradient(rgba(0, 0, 0, 0.3), rgba(0, 0, 0, 0.75));
+  --muted-dark: #aaa;
+  --muted-secondary-dark: #999;
+  --text-gold-dark: #f5f5f5;
+}
+
+body.light-mode {
+  /* Light Mode Overrides */
+  --bg-primary: #ffffff;
+  --bg-secondary: #f8f9fa;
+  --bg-card: #ffffff;
+  --bg-dark: #e9ecef;
+  --text-primary: #1a1a1a;
+  --text-secondary: #495057;
+  --text-muted: #6c757d;
+  --border-color: #dee2e6;
+  --shadow-color: rgba(0,0,0,0.12);
+  --dark-card-gradient: linear-gradient(145deg, #ffffff, #f8f9fa);
+  --dark-hero-gradient: linear-gradient(135deg, #f8f9fa 0%, #ffffff 50%, #f8f9fa 100%);
+  --overlay-dark: linear-gradient(rgba(255, 255, 255, 0.1), rgba(255, 255, 255, 0.7));
+  --muted-dark: #6c757d;
+  --muted-secondary-dark: #adb5bd;
+  --text-gold-dark: #1a1a1a;
+}
+
+body {
+  background-color: var(--bg-primary);
+  color: var(--text-primary);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  font-family: 'Poppins', sans-serif;
+}
+
+/* Arabic font when RTL is active */
+[dir="rtl"] body,
+[dir="rtl"] * {
+  font-family: 'Cairo', 'Poppins', sans-serif;
+}
+
+/* Prevent horizontal scroll on all devices */
+* {
+  max-width: 100%;
+}
+
+/* Smooth scrolling for all elements -->
+html {
+  scroll-behavior: smooth;
+}
+
+/* Touch-friendly tap highlights */
+a, button, input, select, textarea {
+  -webkit-tap-highlight-color: transparent;
+}
+
+/* Better text rendering */
+body {
+  text-rendering: optimizeLegibility;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+.app-container {
+  padding: 20px;
+  min-height: 80vh;
+  background-color: var(--bg-primary);
+  color: var(--text-primary);
+}
+
+section,
+.card,
+.product-card,
+.container,
+.home,
+.deals,
+.categories,
+.hero,
+.home-container,
+.cart-main,
+.products-main {
+  background-color: var(--bg-card);
+  color: var(--text-primary);
+}
+
+/* Light mode overrides for stubborn sections - EXPANDED */
+body.light-mode .hero,
+body.light-mode .deals,
+body.light-mode .categories,
+body.light-mode .features,
+body.light-mode .about,
+body.light-mode .cart-main,
+body.light-mode .products-main,
+body.light-mode .cart-item,
+body.light-mode .product-card,
+body.light-mode .category-card,
+body.light-mode .deals-grid .product-card,
+body.light-mode .quantity-controls,
+body.light-mode .cart-total {
+  background: var(--bg-secondary) !important;
+  color: var(--text-primary) !important;
+  border-color: var(--border-color) !important;
+}
+
+body.light-mode .item-details h4,
+body.light-mode .product-info h4,
+body.light-mode .gold-text,
+body.light-mode .section-header h2 {
+  color: var(--text-gold-dark) !important;
+}
+
+body.light-mode .hero-description,
+body.light-mode .product-description,
+body.light-mode .item-price-single,
+body.light-mode .text-muted {
+  color: var(--text-muted) !important;
+}
+
+/* Responsive images -->
+img {
+  max-width: 100%;
+  height: auto;
+}
+
+/* Prevent overflow on small screens */
+.container {
+  max-width: 100%;
+  overflow: hidden;
+}
+
+/* Custom scrollbar - VAR BASED */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: var(--bg-card);
+}
+
+::-webkit-scrollbar-thumb {
+  background: var(--gold-main);
+  border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: var(--gold-light);
+}
+
+/* Light mode navbar specific - ENHANCED */
+body.light-mode .navbar {
+  background: var(--dark-hero-gradient) !important;
+  color: var(--text-primary) !important;
+  border-bottom: 1px solid var(--border-color) !important;
+  box-shadow: 0 8px 32px var(--shadow-color) !important;
+}
+
+body.light-mode .menu li a,
+body.light-mode .menu-link {
+  color: var(--text-primary) !important;
+}
+
+body.light-mode .search-input {
+  background: rgba(0, 0, 0, 0.1) !important;
+  color: var(--text-primary) !important;
+}
+

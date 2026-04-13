@@ -1,0 +1,22 @@
+/* Dashboard Footer — Clean Admin */
+.dashboard-footer {
+  background: var(--bg-secondary, #1a1a1d);
+  color: var(--text-muted, #71717a);
+  padding: 16px 0;
+  margin-top: auto;
+  border-top: 1px solid var(--border, rgba(255,255,255,0.08));
+}
+
+.dashboard-footer-content {
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 0 24px;
+  text-align: center;
+  font-size: 0.75rem;
+  font-family: 'Inter', -apple-system, sans-serif;
+}
+
+.dashboard-footer p {
+  margin: 0;
+}
+

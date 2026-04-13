@@ -1,0 +1,158 @@
+/* Dashboard Global Styles — Clean Admin Theme */
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
+
+:root {
+  --bg-primary: #111113;
+  --bg-secondary: #1a1a1d;
+  --bg-card: #1e1e21;
+  --bg-elevated: #252529;
+  --text-primary: #e4e4e7;
+  --text-secondary: #a1a1aa;
+  --text-muted: #71717a;
+  --accent: #D4AF37;
+  --accent-hover: #e2c04c;
+  --accent-muted: rgba(212, 175, 55, 0.12);
+  --border: rgba(255, 255, 255, 0.08);
+  --border-accent: rgba(212, 175, 55, 0.2);
+  --radius-sm: 6px;
+  --radius-md: 8px;
+  --radius-lg: 10px;
+  --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.3);
+  --shadow-md: 0 2px 8px rgba(0, 0, 0, 0.4);
+  --shadow-lg: 0 4px 16px rgba(0, 0, 0, 0.5);
+  --transition: 0.15s ease;
+}
+
+* { box-sizing: border-box; }
+
+.dashboard-wrapper {
+  min-height: 100vh;
+  background: var(--bg-primary);
+  color: var(--text-primary);
+  font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+  font-size: 14px;
+  line-height: 1.5;
+  margin: -20px;
+  direction: ltr;
+  text-align: left;
+}
+
+/* Shared Card */
+.dashboard-card {
+  background: var(--bg-card);
+  border-radius: var(--radius-lg);
+  border: 1px solid var(--border);
+  box-shadow: var(--shadow-sm);
+  transition: border-color var(--transition), box-shadow var(--transition);
+}
+
+.dashboard-card:hover {
+  border-color: var(--border-accent);
+  box-shadow: var(--shadow-md);
+}
+
+/* Section Headers */
+.dashboard-section-header {
+  margin-bottom: 24px;
+}
+
+.dashboard-section-title {
+  font-size: 1.25rem;
+  font-weight: 600;
+  color: var(--text-primary);
+  margin-bottom: 4px;
+  letter-spacing: -0.01em;
+}
+
+/* Buttons */
+.dashboard-btn {
+  padding: 8px 16px;
+  border-radius: var(--radius-md);
+  font-weight: 500;
+  cursor: pointer;
+  border: none;
+  font-size: 0.875rem;
+  transition: all var(--transition);
+  font-family: inherit;
+}
+
+.dashboard-btn-primary {
+  background: var(--accent);
+  color: #111;
+}
+
+.dashboard-btn-primary:hover {
+  background: var(--accent-hover);
+  box-shadow: 0 2px 8px rgba(212, 175, 55, 0.25);
+}
+
+.dashboard-btn-outline {
+  background: transparent;
+  color: var(--text-primary);
+  border: 1px solid var(--border);
+}
+
+.dashboard-btn-outline:hover {
+  border-color: var(--accent);
+  color: var(--accent);
+  background: var(--accent-muted);
+}
+
+/* Tables */
+.dashboard-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.875rem;
+}
+
+.dashboard-table th {
+  background: var(--bg-elevated);
+  color: var(--text-secondary);
+  padding: 10px 16px;
+  text-align: left;
+  font-weight: 600;
+  font-size: 0.75rem;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  border-bottom: 1px solid var(--border);
+}
+
+.dashboard-table td {
+  padding: 10px 16px;
+  border-bottom: 1px solid var(--border);
+  color: var(--text-primary);
+}
+
+.dashboard-table tr:hover td {
+  background: rgba(255, 255, 255, 0.02);
+}
+
+/* Status Badges */
+.status-badge {
+  padding: 3px 10px;
+  border-radius: 9999px;
+  font-size: 0.75rem;
+  font-weight: 600;
+  display: inline-block;
+}
+
+.status-pending  { background: rgba(251, 191, 36, 0.15); color: #FBBF24; }
+.status-shipped  { background: rgba(74, 222, 128, 0.15); color: #4ADE80; }
+.status-delivered { background: rgba(96, 165, 250, 0.15); color: #60A5FA; }
+.status-cancelled { background: rgba(248, 113, 113, 0.15); color: #F87171; }
+.status-processing { background: rgba(251, 146, 60, 0.15); color: #FB923C; }
+
+/* Responsive */
+@media (max-width: 768px) {
+  .dashboard-table { font-size: 0.8rem; }
+  .dashboard-table th,
+  .dashboard-table td { padding: 8px 10px; }
+}
+
+/* Animations — subtle only */
+@keyframes dashboardFadeIn {
+  from { opacity: 0; transform: translateY(8px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+.dashboard-animate-up { animation: dashboardFadeIn 0.3s ease-out; }
