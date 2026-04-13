@@ -16,6 +16,11 @@ echo "=============================="
 echo "  ElectroPheuria Server Setup"
 echo "=============================="
 
+# 0. Set hostname
+echo "[0/9] Setting hostname..."
+hostnamectl set-hostname electropheuria-s-1vcpu-1gb-fra1-01
+echo "127.0.1.1 electropheuria-s-1vcpu-1gb-fra1-01" >> /etc/hosts
+
 # 1. System update
 echo "[1/9] Updating system..."
 apt update && apt upgrade -y
