@@ -73,15 +73,18 @@ export const bundleItemImage = (item) => item?.image || null;
 /** Stable React key of a pack item (a product and a deal can share the same id). */
 export const bundleItemKey = (item) => item?.key || `${item?.kind || "product"}-${item?.id}`;
 
-/** Pack items (products) whose cable type the customer must choose. */
+/** Key of a pack item in the cable choices / bundle_variants map: product id, or "deal-<id>". */
+export const bundleChoiceId = (item) => ((item?.kind || "product") === "deal" ? `deal-${item.id}` : item?.id);
+
+/** Pack items (products or single deals) whose cable type the customer must choose. */
 export const bundleCableItems = (deal) =>
-  bundleProducts(deal).filter((p) => (p.kind || "product") === "product" && Array.isArray(p.variants) && p.variants.length > 0);
+  bundleProducts(deal).filter((p) => Array.isArray(p.variants) && p.variants.length > 0);
 
 export const bundleNeedsCableChoice = (deal) => bundleCableItems(deal).length > 0;
 
-/** Every cable item of the pack has an in-stock cable chosen in `choices` ({productId: variantId}). */
+/** Every cable item of the pack has an in-stock cable chosen in `choices` ({choiceId: variantId}). */
 export const bundleChoicesComplete = (deal, choices) =>
-  bundleCableItems(deal).every((p) => p.variants.some((v) => String(v.id) === String(choices?.[p.id]) && Number(v.stock) > 0));
+  bundleCableItems(deal).every((p) => p.variants.some((v) => String(v.id) === String(choices?.[bundleChoiceId(p)]) && Number(v.stock) > 0));
 
 /**
  * Cart line for a pack with the chosen cables: bundle_variants is sent to the server,
@@ -94,10 +97,11 @@ export const bundleCartItem = (deal, choices = {}) => {
   const bundle_choice_labels = [];
   let stock = Number(deal?.stock ?? 0);
   for (const p of cableItems) {
-    const v = p.variants.find((x) => String(x.id) === String(choices[p.id]));
+    const key = bundleChoiceId(p);
+    const v = p.variants.find((x) => String(x.id) === String(choices[key]));
     if (!v) continue;
-    bundle_variants[p.id] = v.id;
-    bundle_choice_labels.push({ id: p.id, name: p.name, label: variantLabel(v) });
+    bundle_variants[key] = v.id;
+    bundle_choice_labels.push({ id: key, name: p.name, label: variantLabel(v) });
     // The chosen cable type can be scarcer than the pack as a whole.
     stock = Math.min(stock, Math.floor(Number(v.stock ?? 0) / Math.max(Number(p.quantity) || 1, 1)));
   }
@@ -107,5 +111,8 @@ export const bundleCartItem = (deal, choices = {}) => {
 /** Part of the cart line key for the chosen pack cables ("" when none). */
 export const bundleChoiceKey = (item) => {
   const entries = Object.entries(item?.bundle_variants || {});
-  return entries.sort(([a], [b]) => Number(a) - Number(b)).map(([pid, vid]) => `-b${pid}:${vid}`).join("");
+  return entries
+    .sort(([a], [b]) => String(a).localeCompare(String(b), undefined, { numeric: true }))
+    .map(([pid, vid]) => `-b${pid}:${vid}`)
+    .join("");
 };

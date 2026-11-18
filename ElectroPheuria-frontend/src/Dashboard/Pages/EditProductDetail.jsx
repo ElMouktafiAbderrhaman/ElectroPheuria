@@ -86,7 +86,7 @@ export default function EditProductDetail() {
         // Images shown from the two products are not the pack's own images: don't save them back.
         if (loaded.images_from_products) loaded.images = [];
       }
-      if (!dealType) setVariantsState(variantsStateFromProduct(loaded));
+      setVariantsState(variantsStateFromProduct(loaded));
       setItem(loaded);
       setLoading(false);
     } else if (contextList.length > 0) {
@@ -102,7 +102,10 @@ export default function EditProductDetail() {
   const isBogo = isDeal && !isBundle && isBogoDeal(item);
   const isBogoFixed = isDeal && !isBundle && isBogoFixedDeal(item);
   const dealDiscount = isDeal && !isBogo ? calcDiscountPercent(item?.oldPrice, item?.price) : null;
-  const showVariants = !isDeal && !!item && (VARIANT_CATEGORIES.includes(item.category) || !!item.has_variants || (item.variants || []).length > 0);
+  // Products in cable categories, and every single deal (deal cables share the deal's price and stock).
+  const showVariants = !!item && (isDeal
+    ? !isBundle
+    : VARIANT_CATEGORIES.includes(item.category) || !!item.has_variants || (item.variants || []).length > 0);
   // Products and other single deals that can go into this pack.
   const packChoices = isBundle ? bundleChoices(productsList, dealsList, item?.dbId || item?.id) : [];
   // Bundles that contain this product / deal (they become unavailable if it is deleted).
@@ -285,7 +288,8 @@ export default function EditProductDetail() {
           : { ...item, deal_type: 'single', offer_type: OFFER_STANDARD, discount: calcDiscountPercent(item.oldPrice, item.price), second_item_price: null };
         delete payload.bundle_products;
         delete payload.images_from_products;
-        await api.updateDeal({ ...payload, id: dbId });
+        delete payload.variants;
+        await api.updateDeal({ ...payload, id: dbId, ...(showVariants && !bundle ? variantsPayload(variantsState) : {}) });
       } else {
         const { variants: _ignored, ...rest } = item;
         // Only send variants when the section is shown, so other products are never touched.
@@ -293,7 +297,7 @@ export default function EditProductDetail() {
       }
 
       // Bundles and variants are rebuilt by the server (combined price, images, labels): reload them.
-      if (bundle || (!dealType && showVariants)) {
+      if (bundle || showVariants) {
         try {
           const fresh = dealType ? await api.getDeals() : await api.getProducts();
           (dealType ? setDealsList : setProductsList)(fresh);
@@ -509,6 +513,7 @@ export default function EditProductDetail() {
               onChange={setVariantsState}
               productPrice={item.price}
               productStock={item.stock}
+              forDeal={isDeal}
             />
           )}
 

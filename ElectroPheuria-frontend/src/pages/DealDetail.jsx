@@ -7,7 +7,7 @@ import api from "../services/api";
 import { dealDiscount, formatPrice, isDealActive, isBogoDeal, isBogoFixedDeal, isComingSoon, lineTotal, offerLabel, byAvailability } from "../utils/dealPricing";
 import { ComingSoonNotice, ComingSoonOverlay } from "../Components/ComingSoon";
 import { trackAddToCart, trackViewContent } from "../utils/fbPixel";
-import { isBundleDeal, bundleProducts, bundleItemImage, bundleItemKey, bundleCableItems, bundleChoicesComplete, bundleCartItem, variantImage, variantLabel } from "../utils/variants";
+import { isBundleDeal, bundleProducts, bundleItemImage, bundleItemKey, bundleCableItems, bundleChoiceId, bundleChoicesComplete, bundleCartItem, activeVariants, variantCartItem, variantStock, variantImage, variantLabel } from "../utils/variants";
 import { cartLineKey } from "../context/CartContext";
 import "../Components/VariantPicker.css";
 import "./ProductDetail.css";
@@ -29,16 +29,22 @@ export default function DealDetail() {
   const [deal, setDeal] = useState(null);
   const [allDeals, setAllDeals] = useState([]);
   const [loadingDeal, setLoadingDeal] = useState(true);
-  // Pack: cable type chosen for each pack product with variants, {productId: variantId}.
+  // Pack: cable type chosen for each pack item with variants, {choiceId: variantId}.
   const [packCables, setPackCables] = useState({});
   const [packCableError, setPackCableError] = useState(false);
   const packPickerRef = useRef(null);
+  // Single deal with cable variants: the chosen cable type.
+  const [selectedVariantId, setSelectedVariantId] = useState(null);
+  const [variantError, setVariantError] = useState(false);
+  const variantPickerRef = useRef(null);
   useEffect(() => {
     api.getDeal(id)
       .then(d => {
         setDeal(d);
         setPackCables({});
         setPackCableError(false);
+        setSelectedVariantId(null);
+        setVariantError(false);
         setLoadingDeal(false);
         if (d?.id) trackViewContent({ ...d, isDeal: true });
       })
@@ -79,15 +85,24 @@ export default function DealDetail() {
     return () => observer.disconnect();
   }, []);
 
+  const dealVariants = isBundleDeal(deal) ? [] : activeVariants(deal);
+  const selectedVariant = dealVariants.find((v) => v.id === selectedVariantId) || null;
+
   const handleAddToCart = () => {
     if (deal && deal.stock > 0 && !isComingSoon(deal) && deal.bundle_complete !== false) {
-      // A pack with a cable product can only be added once every cable type is chosen.
+      // A pack with a cable item can only be added once every cable type is chosen.
       if (!bundleChoicesComplete(deal, packCables)) {
         setPackCableError(true);
         packPickerRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' });
         return;
       }
-      const item = bundleCartItem(deal, packCables);
+      // A deal with cable variants can only be added once a cable type is chosen.
+      if (dealVariants.length > 0 && !selectedVariant) {
+        setVariantError(true);
+        variantPickerRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        return;
+      }
+      const item = selectedVariant ? variantCartItem({ ...deal, isDeal: true }, selectedVariant) : bundleCartItem(deal, packCables);
       const inCart = cart.find((c) => cartLineKey(c) === cartLineKey(item));
       const qtyBefore = inCart?.quantity || 0;
       const qtyAfter = Math.min(qtyBefore + 1, item.stock || 999);
@@ -102,8 +117,15 @@ export default function DealDetail() {
     navigate(-1);
   };
 
+  // Chosen cable type: its image comes first. No deal images: the cable images.
+  const dealImages = () => {
+    const own = (deal?.images?.length ? deal.images : [deal?.image]).filter(Boolean);
+    if (selectedVariant) return [variantImage(selectedVariant), ...own].filter(Boolean);
+    return own.length ? own : dealVariants.map(variantImage).filter(Boolean);
+  };
+
   const nextImage = () => {
-    const images = deal?.images || [deal?.image].filter(Boolean) || [];
+    const images = dealImages();
     if (images.length > 0) {
       setSlideDirection('next');
       setIsSlideAnimating(true);
@@ -116,7 +138,7 @@ export default function DealDetail() {
   };
 
   const prevImage = () => {
-    const images = deal?.images || [deal?.image].filter(Boolean) || [];
+    const images = dealImages();
     if (images.length > 0) {
       setSlideDirection('prev');
       setIsSlideAnimating(true);
@@ -145,7 +167,7 @@ export default function DealDetail() {
     }
   };
 
-  const images = deal?.images || [deal?.image].filter(Boolean) || [];
+  const images = dealImages();
 
   if (loadingDeal) {
     return (
@@ -275,13 +297,13 @@ export default function DealDetail() {
               </div>
             )}
 
-            {isBundle && !unavailable && bundleCableItems(deal).map((p) => (
-              <div key={`cable-${p.id}`} className={`variant-picker${packCableError && !packCables[p.id] ? ' has-error' : ''}`} ref={packPickerRef}>
-                <h3 className="variant-picker-title">{t("chooseCableType")} — <bdi>{p.name}</bdi></h3>
+            {!isBundle && !unavailable && dealVariants.length > 0 && (
+              <div className={`variant-picker${variantError ? ' has-error' : ''}`} ref={variantPickerRef}>
+                <h3 className="variant-picker-title">{t("chooseCableType")}</h3>
                 <div className="variant-options" role="radiogroup" aria-label={t("cableType")}>
-                  {p.variants.map((v) => {
-                    const out = Number(v.stock) <= 0;
-                    const selected = String(packCables[p.id]) === String(v.id);
+                  {dealVariants.map((v) => {
+                    const out = variantStock(deal, v) <= 0;
+                    const selected = selectedVariant?.id === v.id;
                     return (
                       <button
                         key={v.id}
@@ -290,7 +312,7 @@ export default function DealDetail() {
                         aria-checked={selected}
                         disabled={out}
                         className={`variant-option${selected ? ' selected' : ''}${out ? ' out' : ''}`}
-                        onClick={() => { if (!out) { setPackCables((prev) => ({ ...prev, [p.id]: v.id })); setPackCableError(false); } }}
+                        onClick={() => { if (!out) { setSelectedVariantId(v.id); setVariantError(false); setCurrentImageIndex(0); } }}
                       >
                         {variantImage(v) && <img src={variantImage(v)} alt="" className="variant-option-img" />}
                         <span className="variant-option-name" dir="ltr">{variantLabel(v)}</span>
@@ -300,7 +322,36 @@ export default function DealDetail() {
                     );
                   })}
                 </div>
-                {packCableError && !packCables[p.id] && <p className="variant-error" role="alert">{t("chooseCableTypeError")}</p>}
+                {variantError && <p className="variant-error" role="alert">{t("chooseCableTypeError")}</p>}
+              </div>
+            )}
+
+            {isBundle && !unavailable && bundleCableItems(deal).map((p) => (
+              <div key={`cable-${bundleItemKey(p)}`} className={`variant-picker${packCableError && !packCables[bundleChoiceId(p)] ? ' has-error' : ''}`} ref={packPickerRef}>
+                <h3 className="variant-picker-title">{t("chooseCableType")} — <bdi>{p.name}</bdi></h3>
+                <div className="variant-options" role="radiogroup" aria-label={t("cableType")}>
+                  {p.variants.map((v) => {
+                    const out = Number(v.stock) <= 0;
+                    const selected = String(packCables[bundleChoiceId(p)]) === String(v.id);
+                    return (
+                      <button
+                        key={v.id}
+                        type="button"
+                        role="radio"
+                        aria-checked={selected}
+                        disabled={out}
+                        className={`variant-option${selected ? ' selected' : ''}${out ? ' out' : ''}`}
+                        onClick={() => { if (!out) { setPackCables((prev) => ({ ...prev, [bundleChoiceId(p)]: v.id })); setPackCableError(false); } }}
+                      >
+                        {variantImage(v) && <img src={variantImage(v)} alt="" className="variant-option-img" />}
+                        <span className="variant-option-name" dir="ltr">{variantLabel(v)}</span>
+                        {out && <span className="variant-option-out">{t("variantOutOfStock")}</span>}
+                        {selected && <span className="variant-option-check" aria-hidden="true">✓</span>}
+                      </button>
+                    );
+                  })}
+                </div>
+                {packCableError && !packCables[bundleChoiceId(p)] && <p className="variant-error" role="alert">{t("chooseCableTypeError")}</p>}
               </div>
             ))}
 

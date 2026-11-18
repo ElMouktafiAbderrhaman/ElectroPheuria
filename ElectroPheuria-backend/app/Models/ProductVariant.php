@@ -5,8 +5,9 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Model;
 
 /**
- * A selectable cable type of a product (Lightning / USB Type-C).
- * price / stock are optional overrides: null means "same as the product".
+ * A selectable cable type (Lightning / USB Type-C) of a product or of a single deal.
+ * price / stock are optional overrides: null means "same as the product / deal".
+ * Deal variants always use the deal's price and stock.
  */
 class ProductVariant extends Model
 {
@@ -23,7 +24,7 @@ class ProductVariant extends Model
     /** Folder on the "public" disk that holds variant images. */
     public const IMAGE_DIR = 'product-variants';
 
-    protected $fillable = ['product_id', 'type', 'image_path', 'price', 'stock', 'active', 'position'];
+    protected $fillable = ['product_id', 'deal_id', 'type', 'image_path', 'price', 'stock', 'active', 'position'];
 
     protected $hidden = ['created_at', 'updated_at'];
 
@@ -39,6 +40,11 @@ class ProductVariant extends Model
     public function product()
     {
         return $this->belongsTo(Product::class);
+    }
+
+    public function deal()
+    {
+        return $this->belongsTo(Deal::class);
     }
 
     public function getLabelAttribute(): string
@@ -58,14 +64,14 @@ class ProductVariant extends Model
     }
 
     /** Price the customer pays for one unit of this variant. */
-    public function unitPrice(Product $product): float
+    public function unitPrice(Product|Deal $item): float
     {
-        return $this->price !== null ? (float) $this->price : (float) $product->price;
+        return $this->price !== null ? (float) $this->price : (float) $item->price;
     }
 
     /** Units available: the variant's own stock, or the product's when none is set. */
-    public function availableStock(Product $product): int
+    public function availableStock(Product|Deal $item): int
     {
-        return $this->stock !== null ? (int) $this->stock : (int) $product->stock;
+        return $this->stock !== null ? (int) $this->stock : (int) $item->stock;
     }
 }

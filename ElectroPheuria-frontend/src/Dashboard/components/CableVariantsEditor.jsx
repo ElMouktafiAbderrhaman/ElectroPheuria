@@ -93,12 +93,15 @@ const compressToBlob = (file, maxWidth = 900, quality = 0.82) =>
     reader.readAsDataURL(file);
   });
 
-export default function CableVariantsEditor({ value, onChange, productPrice, productStock }) {
+// `onChange` must be a React state setter (it receives updater functions).
+export default function CableVariantsEditor({ value, onChange, productPrice, productStock, forDeal = false }) {
+  const noun = forDeal ? "deal" : "product";
   const [uploading, setUploading] = useState({});
   const [errors, setErrors] = useState({});
 
   const setItem = (type, patch) =>
-    onChange({ ...value, items: { ...value.items, [type]: { ...value.items[type], ...patch } } });
+    // Functional update: two image uploads can finish at the same time.
+    onChange((prev) => ({ ...prev, items: { ...prev.items, [type]: { ...prev.items[type], ...patch } } }));
 
   const handleFile = async (type, file) => {
     if (!file) return;
@@ -107,7 +110,7 @@ export default function CableVariantsEditor({ value, onChange, productPrice, pro
     try {
       const blob = await compressToBlob(file);
       const res = await api.uploadVariantImage(blob, `${type}.jpg`);
-      onChange({ ...value, items: { ...value.items, [type]: { ...value.items[type], image_path: res.path, image_url: res.url } } });
+      setItem(type, { image_path: res.path, image_url: res.url });
     } catch (err) {
       setErrors((e) => ({ ...e, [type]: err?.message || "Upload failed. Please try again." }));
     } finally {
@@ -119,13 +122,13 @@ export default function CableVariantsEditor({ value, onChange, productPrice, pro
     <div className="input-group cable-variants">
       <label>🔌 Cable Variants (optional)</label>
       <p className="field-hint">
-        Sell one cable listing with a choice of connector. Customers pick Lightning or USB Type-C on the product page and the
-        chosen type is saved in the order.
+        Sell one listing with a choice of connector. Customers pick Lightning or USB Type-C on the {noun} page and the
+        chosen type is saved in the order.{forDeal ? " Every cable type uses this deal's price, offer and stock." : ""}
       </p>
 
       <label className="cv-toggle">
-        <input type="checkbox" checked={!!value.enabled} onChange={(e) => onChange({ ...value, enabled: e.target.checked })} />
-        <span>{value.enabled ? "Cable variants enabled" : "Enable cable variants for this product"}</span>
+        <input type="checkbox" checked={!!value.enabled} onChange={(e) => { const enabled = e.target.checked; onChange((prev) => ({ ...prev, enabled })); }} />
+        <span>{value.enabled ? "Cable variants enabled" : `Enable cable variants for this ${noun}`}</span>
       </label>
 
       {value.enabled && (
@@ -157,7 +160,7 @@ export default function CableVariantsEditor({ value, onChange, productPrice, pro
                 </label>
                 {errors[type] && <p className="cv-error">{errors[type]}</p>}
 
-                <div className="input-row">
+                {!forDeal && <div className="input-row">
                   <div className="input-group">
                     <label>Price (MAD)</label>
                     <input
@@ -182,14 +185,17 @@ export default function CableVariantsEditor({ value, onChange, productPrice, pro
                       className="form-input"
                     />
                   </div>
-                </div>
+                </div>}
               </div>
             );
           })}
         </div>
       )}
-      {value.enabled && (
+      {value.enabled && !forDeal && (
         <p className="field-hint">Leave price or stock empty to use the product's own price / stock.</p>
+      )}
+      {value.enabled && forDeal && (
+        <p className="field-hint">Switch a cable type to "Disabled" when it runs out.</p>
       )}
     </div>
   );

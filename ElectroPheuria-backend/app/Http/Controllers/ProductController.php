@@ -116,7 +116,7 @@ class ProductController extends Controller
      *
      * @return array{enabled: bool, rows: ?array}
      */
-    private function validatedVariants(Request $request, ?Product $existing = null): array
+    private function validatedVariants(Request $request, Product|Deal|null $existing = null, bool $forDeal = false): array
     {
         if (!$request->has('variants')) {
             return ['enabled' => (bool) ($existing->has_variants ?? false), 'rows' => null];
@@ -148,8 +148,9 @@ class ProductController extends Controller
             $rows[] = [
                 'type' => $v['type'],
                 'image_path' => $v['image_path'],
-                'price' => isset($v['price']) && $v['price'] !== '' ? round((float) $v['price'], 2) : null,
-                'stock' => isset($v['stock']) && $v['stock'] !== '' ? (int) $v['stock'] : null,
+                // Deal variants always use the deal's price and stock (offers and stock stay in one place).
+                'price' => !$forDeal && isset($v['price']) && $v['price'] !== '' ? round((float) $v['price'], 2) : null,
+                'stock' => !$forDeal && isset($v['stock']) && $v['stock'] !== '' ? (int) $v['stock'] : null,
                 'active' => array_key_exists('active', $v) && $v['active'] !== null ? (bool) $v['active'] : true,
             ];
         }
@@ -164,8 +165,8 @@ class ProductController extends Controller
         return ['enabled' => $enabled, 'rows' => $rows];
     }
 
-    /** Replace the product's variants with $rows (matched by type) and delete images no longer used. */
-    private function syncVariants(Product $product, array $rows): void
+    /** Replace the product's / deal's variants with $rows (matched by type) and delete images no longer used. */
+    private function syncVariants(Product|Deal $product, array $rows): void
     {
         $previousImages = $product->variants()->pluck('image_path')->filter()->all();
         $keep = [];
@@ -529,8 +530,10 @@ class ProductController extends Controller
     public function storeDeal(Request $request)
     {
         [$pricing, $bundleIds, $name] = $this->splitPricing($this->validatedDealPricing($request), $request);
+        // Bundles never have their own cable variants (their items do).
+        $variants = $bundleIds ? ['enabled' => false, 'rows' => null] : $this->validatedVariants($request, null, true);
 
-        $deal = DB::transaction(function () use ($request, $pricing, $bundleIds, $name) {
+        $deal = DB::transaction(function () use ($request, $pricing, $bundleIds, $name, $variants) {
             $deal = Deal::create([
                 'name' => $name,
                 'description' => $request->description ?? '',
@@ -544,9 +547,13 @@ class ProductController extends Controller
                 'reviews' => $request->reviews ?? '',
                 'specs' => $request->specs ?? [],
                 'gallery' => $request->gallery ?? [],
+                'has_variants' => $variants['enabled'],
             ]);
             if ($bundleIds) {
                 $this->syncBundleItems($deal, $bundleIds);
+            }
+            if ($variants['rows'] !== null) {
+                $this->syncVariants($deal, $variants['rows']);
             }
             return $deal;
         });
@@ -559,8 +566,10 @@ class ProductController extends Controller
     {
         $deal = Deal::findOrFail($request->route('id') ?? $request->id);
         [$pricing, $bundleIds, $name] = $this->splitPricing($this->validatedDealPricing($request, $deal), $request);
+        // Turning a deal into a bundle removes its own cable variants.
+        $variants = $bundleIds ? ['enabled' => false, 'rows' => []] : $this->validatedVariants($request, $deal, true);
 
-        DB::transaction(function () use ($request, $deal, $pricing, $bundleIds, $name) {
+        DB::transaction(function () use ($request, $deal, $pricing, $bundleIds, $name, $variants) {
             $deal->update([
                 'name' => $name,
                 'description' => $request->description ?? '',
@@ -573,8 +582,12 @@ class ProductController extends Controller
                 'reviews' => $request->reviews ?? '',
                 'specs' => $request->specs ?? [],
                 'gallery' => $request->gallery ?? [],
+                'has_variants' => $variants['enabled'],
             ]);
             $this->syncBundleItems($deal, $bundleIds);
+            if ($variants['rows'] !== null) {
+                $this->syncVariants($deal, $variants['rows']);
+            }
         });
 
         return response()->json(['success' => true, 'id' => $deal->id]);
@@ -594,8 +607,13 @@ class ProductController extends Controller
     // DELETE /api/deals/{id}
     public function destroyDeal($id)
     {
-        // Bundle rows cascade with the deal; the bundled products are never touched.
-        Deal::where('id', $id)->delete();
+        // Bundle rows and cable variants cascade with the deal; the bundled products are never touched.
+        $deal = Deal::with('variants')->find($id);
+        if ($deal) {
+            $paths = $deal->variants->pluck('image_path')->filter()->all();
+            $deal->delete();
+            $this->deleteVariantImages($paths);
+        }
         return response()->json(['success' => true]);
     }
 }

@@ -168,7 +168,7 @@ export default function EditProductsList() {
                         className="ep-thumb"
                       />
                     </td>
-                    <td className="ep-name">{d.name}{!isDealActive(d) && <span style={{ marginLeft: 8, fontSize: '0.7rem', color: '#f87171' }}>(Inactive)</span>}{isComingSoon(d) && <span style={{ marginLeft: 8, fontSize: '0.7rem', color: '#FFD700' }}>(⏳ Coming soon)</span>}{isBundleDeal(d) && (
+                    <td className="ep-name">{d.name}{!isDealActive(d) && <span style={{ marginLeft: 8, fontSize: '0.7rem', color: '#f87171' }}>(Inactive)</span>}{isComingSoon(d) && <span style={{ marginLeft: 8, fontSize: '0.7rem', color: '#FFD700' }}>(⏳ Coming soon)</span>}{activeVariants(d).length > 0 && <span style={{ display: 'block', fontSize: '0.72rem', color: '#D4AF37' }}>🔌 {activeVariants(d).map(variantLabel).join(' / ')}</span>}{isBundleDeal(d) && (
                       <span style={{ display: 'block', fontSize: '0.72rem', color: d.bundle_complete === false ? '#f87171' : '#D4AF37' }}>
                         🎁 Bundle: {bundleProducts(d).map((p) => p.name).join(' + ') || '—'}{d.bundle_complete === false && ' (a product was deleted — edit or delete this bundle)'}
                       </span>

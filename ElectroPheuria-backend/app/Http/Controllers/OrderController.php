@@ -104,24 +104,24 @@ class OrderController extends Controller
                         $bundleChoices[$row->id] = null;
                         continue;
                     }
-                    $chosen = $choices->firstWhere('id', (int) ($picked[$row->product_id] ?? 0));
+                    $chosen = $choices->firstWhere('id', (int) ($picked[$row->choiceKey()] ?? 0));
                     if (!$chosen) {
                         return response()->json([
-                            'message' => 'Please choose a cable type for ' . $row->product->name . ' in: ' . $model->name,
+                            'message' => 'Please choose a cable type for ' . $row->item()->name . ' in: ' . $model->name,
                         ], 422);
                     }
-                    if ($chosen->availableStock($row->product) <= 0) {
+                    if ($chosen->availableStock($row->item()) <= 0) {
                         return response()->json([
-                            'message' => 'This cable type is out of stock: ' . $row->product->name . ' (' . $chosen->label . ')',
+                            'message' => 'This cable type is out of stock: ' . $row->item()->name . ' (' . $chosen->label . ')',
                         ], 422);
                     }
                     $bundleChoices[$row->id] = $chosen;
                 }
             }
 
-            // Cable variants: the customer must pick one of the active variants.
+            // Cable variants (products and single deals): the customer must pick an active variant.
             $variant = null;
-            if (!$isDeal && $model->has_variants) {
+            if (!($isDeal && $model->isBundle()) && $model->has_variants) {
                 $activeVariants = $model->variants->where('active', true);
                 if ($activeVariants->isNotEmpty()) {
                     $variant = $activeVariants->firstWhere('id', (int) ($item['variant_id'] ?? 0));

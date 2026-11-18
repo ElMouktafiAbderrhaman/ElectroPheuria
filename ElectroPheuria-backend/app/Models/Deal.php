@@ -9,7 +9,7 @@ class Deal extends Model
 {
     use HasFactory;
 
-    protected $fillable = ['name', 'description', 'old_price', 'price', 'discount', 'offer_type', 'second_item_price', 'stock', 'active', 'categories', 'images', 'reviews', 'specs', 'gallery', 'coming_soon', 'deal_type'];
+    protected $fillable = ['name', 'description', 'old_price', 'price', 'discount', 'offer_type', 'second_item_price', 'stock', 'active', 'categories', 'images', 'reviews', 'specs', 'gallery', 'coming_soon', 'deal_type', 'has_variants'];
 
     // Supplier cost data is for the finance tracker only — never in the public catalogue JSON.
     protected $hidden = ['cost_price', 'packaging_cost'];
@@ -28,6 +28,7 @@ class Deal extends Model
         'stock' => 'integer',
         'active' => 'boolean',
         'coming_soon' => 'boolean',
+        'has_variants' => 'boolean',
         'cost_price' => 'float',
         'packaging_cost' => 'float',
     ];
@@ -47,7 +48,13 @@ class Deal extends Model
     }
 
     /** Relations to eager load before reading a bundle's items. */
-    public const BUNDLE_WITH = ['bundleItems.product.variants', 'bundleItems.bundledDeal'];
+    public const BUNDLE_WITH = ['variants', 'bundleItems.product.variants', 'bundleItems.bundledDeal.variants'];
+
+    /** Cable variants of a single deal (they share the deal's price and stock). */
+    public function variants()
+    {
+        return $this->hasMany(ProductVariant::class)->orderBy('position')->orderBy('id');
+    }
 
     public function bundleProducts()
     {

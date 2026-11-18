@@ -6,7 +6,7 @@ use Illuminate\Database\Eloquent\Model;
 
 /**
  * One item of a two-item bundle deal: either a product (product_id) or another
- * single deal (bundled_deal_id). Products with cable variants let the customer choose the cable.
+ * single deal (bundled_deal_id). Items with cable variants let the customer choose the cable.
  */
 class DealBundleItem extends Model
 {
@@ -46,16 +46,22 @@ class DealBundleItem extends Model
         return $this->bundled_deal_id ? $this->bundledDeal : $this->product;
     }
 
+    /** Key of this item in an order's bundle_variants map: product id, or "deal-<id>". */
+    public function choiceKey(): int|string
+    {
+        return $this->bundled_deal_id ? 'deal-' . $this->bundled_deal_id : (int) $this->product_id;
+    }
+
     public function units(): int
     {
         return max((int) ($this->quantity ?? 1), 1);
     }
 
-    /** Active cable variants the customer chooses from (products only). */
+    /** Active cable variants the customer chooses from (a product or a single deal). */
     public function selectableVariants()
     {
         $item = $this->item();
-        if (!$item instanceof Product || !$item->has_variants) {
+        if (!$item || !$item->has_variants || ($item instanceof Deal && $item->isBundle())) {
             return collect();
         }
         return $item->variants->where('active', true)->values();

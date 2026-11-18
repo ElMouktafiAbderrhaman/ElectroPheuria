@@ -106,6 +106,8 @@ export default function AddProduct() {
   const [dealBaseProduct, setDealBaseProduct] = useState("");
   // "single" = existing one-product deal, "bundle" = two different products for one price
   const [dealType, setDealType] = useState("single");
+  // Cable variants of a single deal (they share the deal's price and stock).
+  const [dealVariantsState, setDealVariantsState] = useState(emptyVariantsState);
   const isBundle = dealType === "bundle";
   const [bundleIds, setBundleIds] = useState(["", ""]);
   // Products and existing single deals that can go into a pack.
@@ -265,6 +267,9 @@ export default function AddProduct() {
         alert(bundleError);
         return;
       }
+    } else if (validateVariants(dealVariantsState)) {
+      alert(validateVariants(dealVariantsState));
+      return;
     } else if (!dealName.trim() || !dealPrice || (!isBogo && !dealOldPrice) || (isBogoFixed && dealSecondPrice === "")) {
       alert(isBogoFixed
         ? "Please fill deal name, unit price, and the price of the second item"
@@ -334,7 +339,7 @@ export default function AddProduct() {
       offer_type: isBundle ? OFFER_STANDARD : dealOfferType,
       second_item_price: isBogoFixed && !isBundle ? parseFloat(parseFloat(dealSecondPrice).toFixed(2)) : null,
       deal_type: dealType,
-      ...(isBundle ? { bundle_items: bundleItemsPayload(bundleIds) } : {}),
+      ...(isBundle ? { bundle_items: bundleItemsPayload(bundleIds) } : variantsPayload(dealVariantsState)),
       description: {
         fr: dealDescription.fr.trim(),
         en: dealDescription.en.trim(),
@@ -368,8 +373,8 @@ export default function AddProduct() {
       window.dispatchEvent(new Event('dealsUpdated'));
       // Offer to feature the new deal on the homepage; nothing is published without confirmation.
       setFeaturePrompt({ id: createdDeal?.id, name: dealName.trim() || newDeal.name || "Bundle" });
-      // The server builds the bundle's name / prices / images: reload the list from it.
-      if (isBundle) {
+      // The server builds the bundle's name / prices / images and the cable variants: reload the list from it.
+      if (isBundle || dealVariantsState.enabled) {
         api.getDeals().then((deals) => {
           setDealsList(deals);
           try { localStorage.setItem("ElectroPheuria_deals", JSON.stringify(deals)); } catch { /* full */ }
@@ -378,6 +383,7 @@ export default function AddProduct() {
       }
       setDealType("single");
       setBundleIds(["", ""]);
+      setDealVariantsState(emptyVariantsState());
 
       setDealName("");
       setDealOldPrice("");
@@ -1096,6 +1102,10 @@ export default function AddProduct() {
                 className="form-input deal-input"
               />
             </div>
+            )}
+
+            {!isBundle && (
+              <CableVariantsEditor value={dealVariantsState} onChange={setDealVariantsState} forDeal />
             )}
 
             <div className="input-group">
