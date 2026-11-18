@@ -1,0 +1,175 @@
+/* Cable type picker (product page) and small variant chips (product cards). */
+
+.variant-picker {
+  margin: 4px 0 20px;
+  padding: 14px;
+  border: 1px solid rgba(212, 175, 55, 0.3);
+  border-radius: 16px;
+  background: rgba(212, 175, 55, 0.04);
+  transition: border-color 0.2s ease, box-shadow 0.2s ease;
+}
+
+.variant-picker.has-error {
+  border-color: #ff4757;
+  box-shadow: 0 0 12px rgba(255, 71, 87, 0.25);
+}
+
+.variant-picker-title {
+  margin: 0 0 12px;
+  font-size: 1rem;
+  font-weight: 600;
+  color: #d4af37;
+}
+
+.variant-options {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.variant-option {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  min-height: 44px;
+  padding: 10px 8px 12px;
+  border: 2px solid rgba(255, 255, 255, 0.14);
+  border-radius: 14px;
+  background: #151515;
+  color: #f5f5f5;
+  font: inherit;
+  cursor: pointer;
+  transition: border-color 0.2s ease, transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+.variant-option:hover:not(:disabled) {
+  border-color: rgba(212, 175, 55, 0.6);
+  transform: translateY(-2px);
+}
+
+.variant-option:focus-visible {
+  outline: 2px solid #ffd700;
+  outline-offset: 2px;
+}
+
+.variant-option.selected {
+  border-color: #d4af37;
+  background: linear-gradient(160deg, rgba(212, 175, 55, 0.16), #151515 70%);
+  box-shadow: 0 0 16px rgba(212, 175, 55, 0.35);
+}
+
+.variant-option.out,
+.variant-option:disabled {
+  cursor: not-allowed;
+  opacity: 0.45;
+}
+
+.variant-option.out .variant-option-img {
+  filter: grayscale(1);
+}
+
+.variant-option-img {
+  width: 100%;
+  max-width: 120px;
+  aspect-ratio: 1 / 1;
+  object-fit: contain;
+  border-radius: 10px;
+  background: #fff;
+}
+
+.variant-option-name {
+  font-weight: 600;
+  font-size: 0.95rem;
+}
+
+.variant-option-price {
+  color: #d4af37;
+  font-size: 0.85rem;
+  font-weight: 600;
+}
+
+.variant-option-out {
+  font-size: 0.75rem;
+  color: #ff6b6b;
+}
+
+.variant-option-check {
+  position: absolute;
+  top: 6px;
+  inset-inline-end: 6px;
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  background: #d4af37;
+  color: #000;
+  font-size: 0.8rem;
+  font-weight: 700;
+  line-height: 22px;
+  text-align: center;
+}
+
+.variant-error {
+  margin: 10px 0 0;
+  color: #ff6b6b;
+  font-size: 0.85rem;
+}
+
+/* Small chips on product cards */
+.variant-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin: 6px 0 2px;
+}
+
+.variant-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  min-height: 30px;
+  padding: 3px 9px 3px 3px;
+  border: 1px solid rgba(212, 175, 55, 0.35);
+  border-radius: 999px;
+  background: rgba(0, 0, 0, 0.35);
+  color: #eee;
+  font: inherit;
+  font-size: 0.72rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: border-color 0.2s ease, background 0.2s ease;
+}
+
+[dir="rtl"] .variant-chip {
+  padding: 3px 3px 3px 9px;
+}
+
+.variant-chip img {
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  object-fit: cover;
+  background: #fff;
+}
+
+.variant-chip.selected {
+  border-color: #d4af37;
+  background: rgba(212, 175, 55, 0.2);
+  color: #ffd700;
+}
+
+.variant-chip.out {
+  opacity: 0.45;
+  text-decoration: line-through;
+}
+
+@media (max-width: 480px) {
+  .variant-options {
+    gap: 8px;
+  }
+
+  .variant-option-img {
+    max-width: 96px;
+  }
+}

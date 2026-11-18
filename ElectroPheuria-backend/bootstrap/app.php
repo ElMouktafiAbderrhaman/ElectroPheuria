@@ -11,7 +11,10 @@ return Application::configure(basePath: dirname(__DIR__))
     commands: __DIR__.'/../routes/console.php',
 )
     ->withMiddleware(function (Middleware $middleware): void {
-        //
+        // Enable CORS middleware for API routes
+        $middleware->api(prepend: [
+            \Illuminate\Http\Middleware\HandleCors::class,
+        ]);
     })
     ->withExceptions(function (Exceptions $exceptions): void {
         //

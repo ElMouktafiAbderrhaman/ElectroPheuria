@@ -1,0 +1,105 @@
+/* Two-product "Pack Promotion" card — built on the existing golden deal card styles. */
+
+.bundle-card .bundle-images {
+  display: flex;
+  align-items: stretch;
+  gap: 0;
+  background: #000; /* same black as the product photos */
+}
+
+.bundle-card .bundle-image-slot {
+  position: relative;
+  flex: 1 1 50%;
+  min-width: 0;
+  height: 100%;
+}
+
+.bundle-card .bundle-image-slot + .bundle-image-slot {
+  border-inline-start: 1px solid rgba(212, 175, 55, 0.25);
+}
+
+.bundle-card .bundle-image-slot img {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  background: #000; /* same black as the product photos */
+}
+
+.bundle-card .bundle-image-slot .image-placeholder {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 100%;
+  font-size: 2rem;
+}
+
+.bundle-card .bundle-plus {
+  position: absolute;
+  top: 50%;
+  inset-inline-end: 0;
+  z-index: 2;
+  width: 30px;
+  height: 30px;
+  transform: translate(50%, -50%);
+  border-radius: 50%;
+  background: linear-gradient(135deg, #d4af37, #ffe066);
+  color: #0f0f0f;
+  font-weight: 800;
+  font-size: 1.1rem;
+  line-height: 30px;
+  text-align: center;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.5);
+}
+
+[dir="rtl"] .bundle-card .bundle-plus {
+  transform: translate(-50%, -50%);
+}
+
+.bundle-card .bundle-sticker {
+  z-index: 3;
+}
+
+.bundle-card .bundle-names {
+  margin: 2px 0 4px;
+  color: #cfcfcf;
+  font-size: 0.8rem;
+  line-height: 1.35;
+}
+
+.bundle-card .bundle-names-plus {
+  color: #d4af37;
+}
+
+.bundle-card .bundle-both {
+  display: inline-block;
+  align-self: flex-start;
+  margin-bottom: 6px;
+  padding: 2px 8px;
+  border-radius: 999px;
+  background: rgba(212, 175, 55, 0.12);
+  border: 1px solid rgba(212, 175, 55, 0.4);
+  color: #ffd700;
+  font-size: 0.7rem;
+  font-weight: 600;
+}
+
+
+
+
+.bundle-card:hover .bundle-image-slot img {
+  transform: scale(1.05);
+}
+
+@media (max-width: 768px) {
+  .bundle-card .bundle-plus {
+    width: 24px;
+    height: 24px;
+    font-size: 0.9rem;
+    line-height: 24px;
+  }
+
+
+  .bundle-card .bundle-names {
+    font-size: 0.72rem;
+  }
+}

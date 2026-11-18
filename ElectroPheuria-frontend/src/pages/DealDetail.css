@@ -264,3 +264,130 @@
   opacity: 0.8;
 }
 
+
+/* Phones: keep the sticky "add to cart" bar inside the screen (it was cut off at 390px). */
+@media (max-width: 480px) {
+  .sticky-bottom-bar {
+    gap: 10px;
+    padding: 10px 14px calc(10px + env(safe-area-inset-bottom, 0px));
+  }
+  .sticky-back-btn {
+    width: 42px;
+    height: 42px;
+    font-size: 1.1rem;
+  }
+  .sticky-price {
+    flex: 0 1 auto;
+    font-size: 1.15rem;
+  }
+  .sticky-add-to-cart {
+    flex: 1 1 auto;
+    min-width: 0;
+    padding: 14px 12px;
+    font-size: 0.85rem;
+    letter-spacing: 0;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+}
+
+/* ── Two-product bundle ("Pack Promotion") ── */
+.bundle-detail-box {
+  margin: 4px 0 20px;
+  padding: 16px;
+  border: 1px solid rgba(212, 175, 55, 0.4);
+  border-radius: 16px;
+  background: linear-gradient(160deg, rgba(212, 175, 55, 0.1), rgba(15, 15, 15, 0.6));
+}
+
+.bundle-detail-title {
+  display: block;
+  margin-bottom: 10px;
+  color: #d4af37;
+  font-size: 1rem;
+}
+
+.bundle-detail-items {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.bundle-detail-item {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 8px;
+  border-radius: 12px;
+  background: rgba(0, 0, 0, 0.35);
+}
+
+.bundle-detail-item img,
+.bundle-detail-noimg {
+  flex: 0 0 56px;
+  width: 56px;
+  height: 56px;
+  border-radius: 10px;
+  object-fit: contain;
+  background: #000; /* same black as the product photos */
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.bundle-detail-plus {
+  position: absolute;
+  top: -14px;
+  inset-inline-start: 28px;
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  background: #d4af37;
+  color: #000;
+  font-weight: 800;
+  font-size: 0.8rem;
+  line-height: 20px;
+  text-align: center;
+}
+
+.bundle-detail-name {
+  flex: 1;
+  min-width: 0;
+  color: #f0f0f0;
+  font-size: 0.92rem;
+  font-weight: 600;
+}
+
+.bundle-detail-price {
+  color: #aaa;
+  font-size: 0.85rem;
+  white-space: nowrap;
+}
+
+.bundle-detail-total {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  gap: 6px 16px;
+  margin-top: 12px;
+  padding-top: 10px;
+  border-top: 1px dashed rgba(212, 175, 55, 0.35);
+  color: #bbb;
+  font-size: 0.88rem;
+}
+
+.bundle-detail-pack b {
+  color: #ffd700;
+  font-size: 1.05rem;
+}
+
+.bundle-detail-unavailable {
+  margin: 10px 0 0;
+  color: #ff6b6b;
+  font-size: 0.85rem;
+}

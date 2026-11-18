@@ -9,16 +9,51 @@ class Deal extends Model
 {
     use HasFactory;
 
-    protected $fillable = ['name', 'description', 'old_price', 'price', 'discount', 'stock', 'categories', 'images', 'reviews'];
+    protected $fillable = ['name', 'description', 'old_price', 'price', 'discount', 'offer_type', 'second_item_price', 'stock', 'active', 'categories', 'images', 'reviews', 'specs', 'gallery', 'coming_soon', 'deal_type'];
+
+    // Supplier cost data is for the finance tracker only — never in the public catalogue JSON.
+    protected $hidden = ['cost_price', 'packaging_cost'];
 
     protected $casts = [
         'images' => 'array',
         'categories' => 'array',
         'description' => 'array',
         'reviews' => 'array',
+        'specs' => 'array',
+        'gallery' => 'array',
         'price' => 'float',
         'old_price' => 'float',
         'discount' => 'integer',
+        'second_item_price' => 'float',
         'stock' => 'integer',
+        'active' => 'boolean',
+        'coming_soon' => 'boolean',
+        'cost_price' => 'float',
+        'packaging_cost' => 'float',
     ];
+
+    public const TYPE_SINGLE = 'single';
+    public const TYPE_BUNDLE = 'bundle';
+
+    public function isBundle(): bool
+    {
+        return $this->deal_type === self::TYPE_BUNDLE;
+    }
+
+    /** The two items (products or deals) of a bundle deal. */
+    public function bundleItems()
+    {
+        return $this->hasMany(DealBundleItem::class)->orderBy('position')->orderBy('id');
+    }
+
+    /** Relations to eager load before reading a bundle's items. */
+    public const BUNDLE_WITH = ['bundleItems.product.variants', 'bundleItems.bundledDeal'];
+
+    public function bundleProducts()
+    {
+        return $this->belongsToMany(Product::class, 'deal_bundle_items')
+            ->withPivot(['position', 'quantity'])
+            ->withTimestamps()
+            ->orderBy('deal_bundle_items.position');
+    }
 }

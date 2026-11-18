@@ -1,16 +1,25 @@
 // src/pages/Cart.jsx
-import { useCart } from "../context/CartContext";
+import { useEffect } from "react";
+import { useCart, cartLineKey } from "../context/CartContext";
+import { trackAddToCart } from "../utils/fbPixel";
+import { orderTotals, lineTotal, isBogoDeal, offerLabel, formatPrice } from "../utils/dealPricing";
 import { Link, useNavigate } from "react-router-dom";
 import { useTranslation } from "react-i18next";
+import CartLineExtras, { cartLineImage } from "../Components/CartLineExtras";
 import "./Cart.css";
 
 export default function Cart() {
-const { cart, updateQuantity, removeFromCart } = useCart();
+const { cart, updateQuantity, removeFromCart, syncWithCatalog } = useCart();
   const navigate = useNavigate();
   const { t } = useTranslation();
 
-  // Calculate total price with quantity
-  const totalPrice = cart.reduce((sum, item) => sum + (Number(item.price || 0) * item.quantity), 0);
+  useEffect(() => {
+    syncWithCatalog();
+  }, [syncWithCatalog]);
+
+  // Totals include the "buy 1, get the 2nd at 50% off" savings and the fixed delivery fee
+  const totals = orderTotals(cart);
+  const cur = t("currency");
 
   if (cart.length === 0) {
     return (
@@ -34,25 +43,41 @@ const { cart, updateQuantity, removeFromCart } = useCart();
 
       <div className="cart-items">
         {cart.map((item) => (
-          <div key={item.id} className="cart-item">
+          <div key={cartLineKey(item)} className="cart-item">
             <div className="item-image">
-              <img src={item.images?.[0] || item.image} alt={item.name} />
+              <img src={cartLineImage(item)} alt={item.name} />
             </div>
             <div className="item-details">
               <h4>{item.name}</h4>
-              <p className="item-price">{(item.price * item.quantity).toFixed(2)} MAD</p>
-              <p className="item-price-single">{item.price.toFixed(2)} MAD x {item.quantity}</p>
+              <CartLineExtras item={item} />
+              {isBogoDeal(item) && <span className="cart-offer-tag">{offerLabel(item, t)}</span>}
+              <p className="item-price">
+                {lineTotal(item).discount > 0 && (
+                  <span className="cart-line-old">{formatPrice(lineTotal(item).subtotal)} MAD</span>
+                )}
+                {formatPrice(lineTotal(item).total)} MAD
+              </p>
+              <p className="item-price-single">
+                <bdi dir="ltr">{item.quantity} × {formatPrice(Number(item.price))}</bdi> {cur} · <strong className="cart-qty-words">{t("itemCount", { count: item.quantity })}</strong>
+              </p>
+              {lineTotal(item).discount > 0 && (
+                <p className="cart-line-saving">−{formatPrice(lineTotal(item).discount)} MAD</p>
+              )}
             </div>
             <div className="quantity-controls">
               <button 
-                onClick={() => updateQuantity(item.id, item.quantity - 1)}
+                onClick={() => updateQuantity(item, item.quantity - 1)}
                 disabled={item.quantity <= 1}
               >
                 -
               </button>
               <span className="quantity">{item.quantity}</span>
               <button 
-                onClick={() => updateQuantity(item.id, item.quantity + 1)}
+                onClick={() => {
+                  if (item.quantity >= (item.stock || 999)) return;
+                  updateQuantity(item, item.quantity + 1);
+                  trackAddToCart(item, 1, item.quantity);
+                }}
                 disabled={item.quantity >= (item.stock || 999)}
               >
                 +
@@ -60,7 +85,7 @@ const { cart, updateQuantity, removeFromCart } = useCart();
             </div>
             <button
               className="remove-button"
-              onClick={() => removeFromCart(item.id)}
+              onClick={() => removeFromCart(item)}
             >
               🗑️
             </button>
@@ -69,7 +94,15 @@ const { cart, updateQuantity, removeFromCart } = useCart();
       </div>
 
       <div className="cart-total">
-        <p>{t("totalPrice")}: <span className="total-amount">MAD {totalPrice.toFixed(2)}</span></p>
+        {totals.discount > 0 && (
+          <>
+            <p className="cart-breakdown">{t("subtotal")}: <span><bdi dir="ltr">{formatPrice(totals.subtotal)}</bdi> {cur}</span></p>
+            <p className="cart-breakdown cart-breakdown-saving">{t("offerSavings")}: <span><bdi dir="ltr">−{formatPrice(totals.discount)}</bdi> {cur}</span></p>
+          </>
+        )}
+        <p className="cart-breakdown">{t("productsSubtotal")} ({t("itemCount", { count: totals.items })}): <span><bdi dir="ltr">{formatPrice(totals.products)}</bdi> {cur}</span></p>
+        <p className="cart-breakdown">{t("deliveryFeeLine")}: <span>+ <bdi dir="ltr">{formatPrice(totals.delivery)}</bdi> {cur}</span></p>
+        <p className="cart-grand-total">{t("youPay")}: <span className="total-amount"><bdi dir="ltr">{formatPrice(totals.total)}</bdi> {cur}</span></p>
       </div>
 
       <div className="cart-actions">

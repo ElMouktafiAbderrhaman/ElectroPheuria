@@ -1,6 +1,7 @@
 // src/Dashboard/Pages/EditProducts.jsx
 import { useOutletContext } from "react-router-dom";
 import api from "../../services/api.js";
+import { dealDiscount, isBogoDeal, offerShortLabel } from "../../utils/dealPricing";
 import "./EditProducts.css";
 
 export default function EditProducts() {
@@ -143,14 +144,14 @@ export default function EditProducts() {
                     className="card-image" 
                     onError={(e) => { e.target.src = fallback; }}
                   />
-                  <span className="discount-badge-card">-{d.discount}%</span>
+                  {isBogoDeal(d) ? <span className="discount-badge-card">{offerShortLabel(d)}</span> : dealDiscount(d) !== null && <span className="discount-badge-card">-{dealDiscount(d)}%</span>}
                 </div>
 
                 <div className="card-content">
                   <h3 className="card-title">{d.name}</h3>
                   <p className="card-description" style={{textAlign: 'left', marginLeft: 0}}>{d.description || 'No description'}</p>
                   <div className="deal-prices">
-                    <span className="old-price">{d.oldPrice} MAD</span>
+                    {!isBogoDeal(d) && <span className="old-price">{d.oldPrice} MAD</span>}
                     <span className="new-price">{d.price} MAD</span>
                   </div>
                 </div>

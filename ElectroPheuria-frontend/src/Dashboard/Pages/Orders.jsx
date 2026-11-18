@@ -1,7 +1,49 @@
 // src/pages/Orders.jsx
 import { useState, useEffect } from "react";
 import api from '../../services/api.js';
+import { orderAmounts } from "../../utils/dealPricing";
 import "./Orders.css"; // Import the CSS file
+
+/** Full delivery address of an order (orders placed before this field existed have none). */
+const orderAddress = (order) => order?.delivery_address || order?.client_data?.delivery_address || "";
+const orderCity = (order) => order?.client_data?.city || order?.client_data?.address || order?.client?.address || order?.address || "";
+
+async function copyText(text) {
+  try {
+    await navigator.clipboard.writeText(text);
+    return true;
+  } catch {
+    // Fallback for http:// or older browsers
+    const el = document.createElement("textarea");
+    el.value = text;
+    el.setAttribute("readonly", "");
+    el.style.position = "fixed";
+    el.style.opacity = "0";
+    document.body.appendChild(el);
+    el.select();
+    const ok = document.execCommand("copy");
+    document.body.removeChild(el);
+    return ok;
+  }
+}
+
+/** Order line: name × qty, plus the chosen cable type or the two products of a pack. */
+function OrderLine({ p }) {
+  return (
+    <div className="order-item-line">
+      {p.name} x{p.quantity}
+      {p.variant_label && <span className="order-item-variant">🔌 {p.variant_label}</span>}
+      {Array.isArray(p.bundle_items) && p.bundle_items.length > 0 && (
+        <div className="order-item-bundle">
+          <span className="order-item-bundle-tag">🎁 Pack</span>
+          {p.bundle_items.map((b, i) => (
+            <div key={i} className="order-item-bundle-line">↳ {b.name} x{(b.quantity || 1) * (p.quantity || 1)}{b.variant_label && <span className="order-item-variant">🔌 {b.variant_label}</span>}</div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
 
 export default function Orders() {
   const [orders, setOrders] = useState([]);
@@ -9,12 +51,32 @@ export default function Orders() {
   const [error, setError] = useState(null);
   const [searchId, setSearchId] = useState("");
   const [confirmRefund, setConfirmRefund] = useState(null);
+  const [copiedId, setCopiedId] = useState(null);
+
+  const handleCopyAddress = async (order) => {
+    const text = [orderAddress(order), orderCity(order)].filter(Boolean).join(", ");
+    if (text && (await copyText(text))) {
+      setCopiedId(order.id);
+      setTimeout(() => setCopiedId((id) => (id === order.id ? null : id)), 2000);
+    }
+  };
 
   const statusOrder = { pending: 0, ongoing: 1, shipped: 2, done: 3, refunded: 4, cancelled: 5 };
 
   const activeOrders = orders
     .filter(o => !['done', 'cancelled', 'refunded'].includes(o.status))
-    .filter(o => searchId === "" || String(o.id).includes(searchId))
+    .filter(o => {
+      if (searchId === "") return true;
+      const q = searchId.toLowerCase();
+      return (
+        String(o.id).includes(q) ||
+        (o.client_data?.name || o.client?.name || "").toLowerCase().includes(q) ||
+        (o.client_data?.email || o.client?.email || "").toLowerCase().includes(q) ||
+        (o.client_data?.phone || o.client?.phone || "").toLowerCase().includes(q) ||
+        (o.client_data?.city || o.client_data?.address || o.client?.address || "").toLowerCase().includes(q) ||
+        orderAddress(o).toLowerCase().includes(q)
+      );
+    })
     .sort((a, b) => (statusOrder[a.status] ?? 99) - (statusOrder[b.status] ?? 99));
 
   useEffect(() => {
@@ -36,7 +98,7 @@ export default function Orders() {
   const handleStatusChange = async (orderId, newStatus) => {
     try {
       await api.updateOrderStatus(orderId, newStatus);
-      setOrders(prev => prev.map(o => 
+      setOrders(prev => prev.map(o =>
         o.id === orderId ? { ...o, status: newStatus } : o
       ));
       window.dispatchEvent(new Event("ordersUpdated"));
@@ -73,7 +135,7 @@ export default function Orders() {
         <div className="orders-search">
           <input
             type="text"
-            placeholder="Search by Order ID..."
+            placeholder="Search by ID, name, email, phone or address..."
             value={searchId}
             onChange={(e) => setSearchId(e.target.value)}
             className="search-input"
@@ -102,6 +164,7 @@ export default function Orders() {
               <th>Customer</th>
               <th>Phone</th>
               <th>City</th>
+              <th>Delivery Address</th>
               <th>Email</th>
               <th>Items</th>
               <th>Date</th>
@@ -116,14 +179,27 @@ export default function Orders() {
                 <td>{order?.id || "N/A"}</td>
 <td>{order.client_data?.name || order?.client?.name || order?.customer || "N/A"}</td>
                 <td>{order.client_data?.phone || order?.client?.phone || order?.phone || "N/A"}</td>
-                <td>{order.client_data?.address || order?.client?.address || order?.address || "N/A"}</td>
+                <td>{orderCity(order) || "N/A"}</td>
+                <td className="order-address-cell">
+                  {orderAddress(order) ? (
+                    <div className="order-address">
+                      <span className="order-address-text" dir="auto">{orderAddress(order)}</span>
+                      <button
+                        type="button"
+                        className={`copy-address-btn${copiedId === order.id ? " copied" : ""}`}
+                        onClick={() => handleCopyAddress(order)}
+                        title="Copy address and city"
+                      >
+                        {copiedId === order.id ? "✓ Copied" : "📋 Copy"}
+                      </button>
+                    </div>
+                  ) : "—"}
+                </td>
                 <td>{order.client_data?.email || order?.client?.email || order?.email || "—"}</td>
                 <td className="order-items">
                   {(() => {
                     const products = typeof order?.products === 'string' ? JSON.parse(order.products) : order?.products;
-                    return products?.map((p, i) => (
-                      <div key={i} className="order-item-line">{p.name} x{p.quantity}</div>
-                    )) || "—";
+                    return products?.map((p, i) => <OrderLine key={i} p={p} />) || "—";
                   })()}
                 </td>
                 <td>{order?.created_at ? new Date(order.created_at).toLocaleDateString() : (order?.date || "N/A")}</td>
@@ -133,7 +209,12 @@ export default function Orders() {
                   </span>
                 </td>
                 <td className="total-amount">
-                  MAD {Number(order?.total_price || order?.total || 0).toFixed(2)}
+                  MAD {orderAmounts(order).total.toFixed(2)}
+                  {orderAmounts(order).delivery > 0 && (
+                    <div className="order-total-split">
+                      {orderAmounts(order).products.toFixed(2)} products + {orderAmounts(order).delivery.toFixed(2)} delivery
+                    </div>
+                  )}
                 </td>
                 <td className="order-actions">
                   {order.status === "pending" && (
@@ -174,11 +255,13 @@ export default function Orders() {
           <p className="summary-number">{activeOrders.filter(o => o.status === "pending").length}</p>
         </div>
         <div className="summary-card">
-          <h3>Total Revenue</h3>
+          <h3>To Collect (incl. delivery)</h3>
           <p className="summary-number">
-            MAD {activeOrders.reduce((sum, o) => {
-              return sum + Number(o.total_price || o.total || 0);
-            }, 0).toFixed(2)}
+            MAD {activeOrders.reduce((sum, o) => sum + orderAmounts(o).total, 0).toFixed(2)}
+          </p>
+          <p className="order-total-split">
+            Products MAD {activeOrders.reduce((sum, o) => sum + orderAmounts(o).products, 0).toFixed(2)}
+            {" · "}Delivery MAD {activeOrders.reduce((sum, o) => sum + orderAmounts(o).delivery, 0).toFixed(2)}
           </p>
         </div>
       </div>

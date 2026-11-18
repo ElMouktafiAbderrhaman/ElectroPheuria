@@ -53,7 +53,7 @@ export default function Clients() {
               <th>Name</th>
               <th>Email</th>
               <th>Phone</th>
-              <th>Address</th>
+              <th>City</th>
               <th>Orders</th>
               <th>Actions</th>
             </tr>

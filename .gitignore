@@ -5,3 +5,7 @@ __pycache__/
 .DS_Store
 Thumbs.db
 desktop.ini
+
+# Database dumps and archives (contain customer data)
+*.sql
+*.zip

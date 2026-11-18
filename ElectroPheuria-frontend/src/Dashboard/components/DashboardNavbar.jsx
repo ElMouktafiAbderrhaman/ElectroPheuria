@@ -63,6 +63,8 @@ export default function DashboardNavbar() {
         <Link to="/dashboard/clients" className="navbar-link" onClick={() => setMenuOpen(false)}>Clients</Link>
         <Link to="/dashboard/sales" className="navbar-link" onClick={() => setMenuOpen(false)}>Sales</Link>
         <Link to="/dashboard/edit-products" className="navbar-link" onClick={() => setMenuOpen(false)}>Edit Products</Link>
+        <Link to="/dashboard/banners" className="navbar-link" onClick={() => setMenuOpen(false)}>Banners</Link>
+        <Link to="/dashboard/tracker" className="navbar-link" onClick={() => setMenuOpen(false)}>Tracker</Link>
         <button className="navbar-link logout-link" onClick={handleLogout}>Logout</button>
       </div>
 

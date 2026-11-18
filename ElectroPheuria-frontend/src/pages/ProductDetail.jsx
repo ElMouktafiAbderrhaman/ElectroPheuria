@@ -1,14 +1,20 @@
 import { useState, useEffect, useRef, useMemo } from "react";
 import { createPortal } from "react-dom";
-import { useParams, useNavigate } from "react-router-dom";
+import { useParams, useNavigate, useSearchParams } from "react-router-dom";
 import { useTranslation } from "react-i18next";
-import { useCart } from "../context/CartContext";
+import { useCart, cartLineKey } from "../context/CartContext";
+import api from "../services/api";
+import { trackAddToCart, trackViewContent } from "../utils/fbPixel";
+import { isComingSoon, isProductActive, formatPrice, byAvailability } from "../utils/dealPricing";
+import { activeVariants, variantPrice, variantStock, variantImage, variantLabel, variantCartItem, productSoldOut, variantPriceRange } from "../utils/variants";
+import { ComingSoonNotice, ComingSoonOverlay } from "../Components/ComingSoon";
 import "./ProductDetail.css";
+import "../Components/VariantPicker.css";
 
 export default function ProductDetail() {
   const { id } = useParams();
   const navigate = useNavigate();
-  const { addToCart } = useCart();
+  const { cart, addToCart } = useCart();
   const { t, i18n } = useTranslation();
 
   // Helper: get localized text from multi-lang object or old string
@@ -18,23 +24,44 @@ export default function ProductDetail() {
     return field;
   };
 
-  const [allProducts] = useState(() => {
-    const saved = localStorage.getItem("ElectroPheuria_products");
-    return saved ? JSON.parse(saved) : [];
-  });
-  
-  const product = useMemo(() => {
-    return allProducts.find(p => String(p.id) === id) || null;
-  }, [allProducts, id]);
+  const [product, setProduct] = useState(null);
+  const [allProducts, setAllProducts] = useState([]);
+  const [loadingProduct, setLoadingProduct] = useState(true);
+  const [searchParams] = useSearchParams();
+  const [selectedVariantId, setSelectedVariantId] = useState(null);
+  const [variantError, setVariantError] = useState(false);
+  const variantPickerRef = useRef(null);
+  const [currentImageIndex, setCurrentImageIndex] = useState(0);
+
+  useEffect(() => {
+    api.getProduct(id)
+      .then(p => {
+        setProduct(p);
+        // Pre-select the cable type picked on the product card (?variant=usb_c), if available.
+        const wanted = searchParams.get("variant");
+        const pre = activeVariants(p).find((v) => v.type === wanted && variantStock(p, v) > 0);
+        setSelectedVariantId(pre ? pre.id : null);
+        setVariantError(false);
+        setCurrentImageIndex(0);
+        setLoadingProduct(false);
+        if (p?.id) trackViewContent(p);
+      })
+      .catch(() => {
+        setProduct(null);
+        setLoadingProduct(false);
+      });
+    api.getProducts().then(setAllProducts).catch(() => {});
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [id]);
 
   const similarProducts = useMemo(() => {
     if (!product) return [];
     return allProducts
-      .filter(p => p.category === product.category && String(p.id) !== id)
+      .filter(p => isProductActive(p) && p.category === product.category && String(p.id) !== id)
+      .sort(byAvailability(productSoldOut))
       .slice(0, 6);
   }, [allProducts, product, id]);
 
-  const [currentImageIndex, setCurrentImageIndex] = useState(0);
   const [isSlideAnimating, setIsSlideAnimating] = useState(false);
   const [slideDirection, setSlideDirection] = useState('next');
   const [footerVisible, setFooterVisible] = useState(false);
@@ -51,9 +78,31 @@ export default function ProductDetail() {
     return () => observer.disconnect();
   }, []);
 
+  const variants = activeVariants(product);
+  const selectedVariant = variants.find((v) => v.id === selectedVariantId) || null;
+
+  const selectVariant = (variant) => {
+    if (variantStock(product, variant) <= 0) return;
+    setSelectedVariantId(variant.id);
+    setVariantError(false);
+    setCurrentImageIndex(0); // the chosen cable's image is shown first
+  };
+
   const handleAddToCart = () => {
-    if (product && product.stock > 0) {
-      addToCart(product);
+    if (!product || isComingSoon(product)) return;
+    // A cable with variants can only be added once a cable type is chosen.
+    if (variants.length > 0 && !selectedVariant) {
+      setVariantError(true);
+      variantPickerRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      return;
+    }
+    const item = selectedVariant ? variantCartItem(product, selectedVariant) : product;
+    if (item.stock > 0) {
+      const inCart = cart.find((c) => cartLineKey(c) === cartLineKey(item));
+      const qtyBefore = inCart?.quantity || 0;
+      const qtyAfter = Math.min(qtyBefore + 1, item.stock || 999);
+      addToCart(item);
+      if (qtyAfter > qtyBefore) trackAddToCart(item, qtyAfter - qtyBefore, qtyBefore);
       navigate('/cart');
     }
   };
@@ -105,7 +154,22 @@ export default function ProductDetail() {
     }
   };
 
-  const images = product?.images || [product?.image].filter(Boolean) || [];
+  const productImages = (product?.images?.length ? product.images : [product?.image]).filter(Boolean);
+  // Chosen cable type: its image comes first. No choice yet: product images, else the variant images.
+  const images = selectedVariant
+    ? [variantImage(selectedVariant), ...productImages].filter(Boolean)
+    : productImages.length ? productImages : variants.map(variantImage).filter(Boolean);
+
+  if (loadingProduct) {
+    return (
+      <div className="product-detail-main">
+        <div className="product-detail-loading">
+          <div className="detail-spinner"></div>
+          <p>Chargement du produit...</p>
+        </div>
+      </div>
+    );
+  }
 
   if (!product) {
     return (
@@ -120,7 +184,17 @@ export default function ProductDetail() {
     );
   }
 
-  const finalPrice = product.new_price || product.price;
+  const range = variantPriceRange(product);
+  const finalPrice = selectedVariant
+    ? formatPrice(variantPrice(product, selectedVariant))
+    : range && range.min !== range.max
+      ? `${formatPrice(range.min)} – ${formatPrice(range.max)}`
+      : range ? formatPrice(range.min) : (product.new_price || product.price);
+  const comingSoon = isComingSoon(product);
+  const soldOut = selectedVariant ? variantStock(product, selectedVariant) <= 0 : productSoldOut(product);
+  const unavailable = comingSoon || soldOut;
+  const buyLabel = comingSoon ? t("comingSoon") : soldOut ? t("soldOut") : t("addToCart");
+  const buyClass = comingSoon ? " coming-soon-btn" : soldOut ? " disabled-btn" : "";
 
   return (
     <>
@@ -191,11 +265,43 @@ export default function ProductDetail() {
             <h1 className="product-title">{product.name}</h1>
             
             <div className="price-section">
-              <span className="detail-price">{product.price} MAD</span>
+              <span className="detail-price" dir="ltr">{finalPrice} MAD</span>
             </div>
 
+            {variants.length > 0 && !comingSoon && (
+              <div className={`variant-picker${variantError ? ' has-error' : ''}`} ref={variantPickerRef}>
+                <h3 className="variant-picker-title">{t("chooseCableType")}</h3>
+                <div className="variant-options" role="radiogroup" aria-label={t("cableType")}>
+                  {variants.map((v) => {
+                    const out = variantStock(product, v) <= 0;
+                    const selected = selectedVariant?.id === v.id;
+                    return (
+                      <button
+                        key={v.id}
+                        type="button"
+                        role="radio"
+                        aria-checked={selected}
+                        disabled={out}
+                        className={`variant-option${selected ? ' selected' : ''}${out ? ' out' : ''}`}
+                        onClick={() => selectVariant(v)}
+                      >
+                        {variantImage(v) && <img src={variantImage(v)} alt="" className="variant-option-img" />}
+                        <span className="variant-option-name" dir="ltr">{variantLabel(v)}</span>
+                        <span className="variant-option-price" dir="ltr">{formatPrice(variantPrice(product, v))} MAD</span>
+                        {out && <span className="variant-option-out">{t("variantOutOfStock")}</span>}
+                        {selected && <span className="variant-option-check" aria-hidden="true">✓</span>}
+                      </button>
+                    );
+                  })}
+                </div>
+                {variantError && <p className="variant-error" role="alert">{t("chooseCableTypeError")}</p>}
+              </div>
+            )}
+
+            {comingSoon && <ComingSoonNotice />}
+
             <div className="stock-info">
-              {product.stock <= 0 && (
+              {!comingSoon && soldOut && (
                 <span className="sold-out-detail-badge">{t("soldOut")}</span>
               )}
             </div>
@@ -210,10 +316,10 @@ export default function ProductDetail() {
             <div className="add-to-cart-row">
               <button 
                 onClick={handleAddToCart}
-                className={`detail-add-to-cart${product.stock <= 0 ? ' disabled-btn' : ''}`}
-                disabled={product.stock <= 0}
+                className={`detail-add-to-cart${buyClass}`}
+                disabled={unavailable}
               >
-                {product.stock <= 0 ? t("soldOut") : t("addToCart")}
+                {buyLabel}
               </button>
               <button onClick={goBack} className="detail-back-button">
                 {t("backToProducts")}
@@ -272,7 +378,7 @@ export default function ProductDetail() {
               {similarProducts.map((item) => (
                 <div 
                   key={item.id} 
-                  className={`similar-product-card${item.stock <= 0 ? ' sold-out-card' : ''}`}
+                  className={`similar-product-card${isComingSoon(item) ? ' coming-soon-card' : productSoldOut(item) ? ' sold-out-card' : ''}`}
                   onClick={() => {
                     navigate(`/product/${item.id}`);
                     window.scrollTo({ top: 0, behavior: 'smooth' });
@@ -284,7 +390,7 @@ export default function ProductDetail() {
                     ) : (
                       <div className="image-placeholder">📦</div>
                     )}
-                    {item.stock <= 0 && (
+                    {isComingSoon(item) ? <ComingSoonOverlay compact /> : productSoldOut(item) && (
                       <div className="sold-out-overlay">
                         <span className="sold-out-badge">{t("soldOut")}</span>
                       </div>
@@ -308,9 +414,9 @@ export default function ProductDetail() {
           <button onClick={goBack} className="sticky-back-btn" aria-label={t("backToProducts")}>
             ←
           </button>
-          <span className="sticky-price">{finalPrice} MAD</span>
-          <button onClick={handleAddToCart} className={`sticky-add-to-cart${product.stock <= 0 ? ' disabled-btn' : ''}`} disabled={product.stock <= 0}>
-            {product.stock <= 0 ? t("soldOut") : t("addToCart")}
+          <span className="sticky-price" dir="ltr">{finalPrice} MAD</span>
+          <button onClick={handleAddToCart} className={`sticky-add-to-cart${buyClass}`} disabled={unavailable}>
+            {buyLabel}
           </button>
         </div>,
         document.body

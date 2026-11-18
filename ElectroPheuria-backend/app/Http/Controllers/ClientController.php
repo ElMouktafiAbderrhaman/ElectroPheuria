@@ -13,6 +13,18 @@ class ClientController extends Controller
         return response()->json($clients);
     }
 
+    public function show($id)
+    {
+        $client = Client::with('orders')->findOrFail($id);
+        return response()->json($client);
+    }
+
+    public function orders($id)
+    {
+        $client = Client::findOrFail($id);
+        return response()->json($client->orders()->get());
+    }
+
     public function webIndex()
     {
         $clients = Client::with('orders')->get();

@@ -301,6 +301,23 @@ label {
   cursor: pointer;
 }
 
+/* Deal pricing validation + status */
+.form-input.input-invalid {
+  border-color: #ef4444;
+}
+
+.deal-price-error {
+  color: #f87171;
+  font-size: 0.8125rem;
+  margin: -8px 0 16px;
+}
+
+.deal-active-toggle {
+  margin: 0;
+  color: var(--text-primary, #e4e4e7);
+  padding: 10px 14px;
+}
+
 /* Deal Preview */
 .deal-preview {
   background: var(--accent-muted, rgba(212,175,55,0.12));
@@ -591,5 +608,90 @@ label {
   
   .spec-remove-btn {
     align-self: flex-end;
+  }
+}
+
+/* Offer type selector (Standard / 2nd -50% / 2nd at a fixed price) */
+.offer-type-switch {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 10px;
+}
+
+.offer-type-option {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin: 0;
+  padding: 12px 14px;
+  border: 1px solid var(--border, rgba(255,255,255,0.08));
+  border-radius: var(--radius-md, 8px);
+  background: var(--bg-elevated, #252529);
+  cursor: pointer;
+  transition: border-color 0.15s ease, background 0.15s ease;
+}
+
+.offer-type-option input {
+  position: absolute;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.offer-type-option:hover,
+.offer-type-option.active {
+  border-color: var(--accent, #D4AF37);
+}
+
+.offer-type-option.active {
+  background: var(--accent-muted, rgba(212,175,55,0.12));
+}
+
+.offer-type-option:focus-within {
+  outline: 2px solid var(--accent, #D4AF37);
+  outline-offset: 2px;
+}
+
+.offer-type-title {
+  color: var(--text-primary, #e4e4e7);
+  font-weight: 600;
+  font-size: 0.875rem;
+}
+
+.offer-type-desc {
+  color: var(--text-muted, #71717a);
+  font-size: 0.75rem;
+}
+
+.bogo-explain {
+  margin: 0;
+  color: var(--text-primary, #e4e4e7);
+  font-size: 0.8125rem;
+  line-height: 1.5;
+}
+
+.bogo-preview-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.875rem;
+}
+
+.bogo-preview-table td {
+  padding: 6px 4px;
+  border-top: 1px solid rgba(212, 175, 55, 0.15);
+  color: var(--text-primary, #e4e4e7);
+}
+
+.bogo-preview-table td:nth-child(2),
+.bogo-preview-table td:nth-child(3) {
+  text-align: right;
+}
+
+.bogo-preview-table .preview-new {
+  font-size: 1rem;
+}
+
+@media (max-width: 768px) {
+  .offer-type-switch {
+    grid-template-columns: 1fr;
   }
 }

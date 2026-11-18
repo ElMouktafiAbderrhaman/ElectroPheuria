@@ -1,5 +1,7 @@
 import { useOutletContext, Link, useNavigate } from "react-router-dom";
 import api from "../../services/api.js";
+import { dealDiscount, isDealActive, isProductActive, isBogoDeal, isComingSoon, offerShortLabel } from "../../utils/dealPricing";
+import { activeVariants, variantLabel, isBundleDeal, bundleProducts } from "../../utils/variants";
 import "./EditProductsList.css";
 
 export default function EditProductsList() {
@@ -20,11 +22,16 @@ export default function EditProductsList() {
       await api.deleteProduct(dbId);
     } catch (error) {
       console.error('Database delete failed:', error);
+      alert('Failed to delete product. Please try again.');
       return;
     }
     const updated = productsList.filter((p) => p.id !== id);
     setProductsList(updated);
-    localStorage.setItem("ElectroPheuria_products", JSON.stringify(updated));
+    try {
+      localStorage.setItem("ElectroPheuria_products", JSON.stringify(updated));
+    } catch (storageErr) {
+      console.warn('localStorage full, delete not cached locally');
+    }
     window.dispatchEvent(new Event('productsUpdated'));
   };
 
@@ -37,11 +44,16 @@ export default function EditProductsList() {
       await api.deleteDeal(dbId);
     } catch (error) {
       console.error('Database delete failed:', error);
+      alert('Failed to delete deal. Please try again.');
       return;
     }
     const updated = dealsList.filter((d) => d.id !== id);
     setDealsList(updated);
-    localStorage.setItem("ElectroPheuria_deals", JSON.stringify(updated));
+    try {
+      localStorage.setItem("ElectroPheuria_deals", JSON.stringify(updated));
+    } catch (storageErr) {
+      console.warn('localStorage full, delete not cached locally');
+    }
     window.dispatchEvent(new Event('dealsUpdated'));
   };
 
@@ -101,7 +113,7 @@ export default function EditProductsList() {
                           onError={(e) => { e.target.src = getFallbackImage(p.category); }}
                         />
                       </td>
-                      <td className="ep-name">{p.name}</td>
+                      <td className="ep-name">{p.name}{!isProductActive(p) && <span style={{ marginLeft: 8, fontSize: '0.7rem', color: '#f87171' }}>(Hidden)</span>}{isComingSoon(p) && <span style={{ marginLeft: 8, fontSize: '0.7rem', color: '#FFD700' }}>(⏳ Coming soon)</span>}{activeVariants(p).length > 0 && <span style={{ display: 'block', fontSize: '0.72rem', color: '#D4AF37' }}>🔌 {activeVariants(p).map(variantLabel).join(' / ')}</span>}</td>
                       <td><span className="ep-badge">{p.category}</span></td>
                       <td className="ep-price">{p.price} MAD</td>
                       <td className="ep-stock">{p.stock ?? 0}</td>
@@ -156,13 +168,18 @@ export default function EditProductsList() {
                         className="ep-thumb"
                       />
                     </td>
-                    <td className="ep-name">{d.name}</td>
-                    <td className="ep-old-price">{d.oldPrice} MAD</td>
-                    <td><span className="ep-discount">-{d.discount}%</span></td>
+                    <td className="ep-name">{d.name}{!isDealActive(d) && <span style={{ marginLeft: 8, fontSize: '0.7rem', color: '#f87171' }}>(Inactive)</span>}{isComingSoon(d) && <span style={{ marginLeft: 8, fontSize: '0.7rem', color: '#FFD700' }}>(⏳ Coming soon)</span>}{isBundleDeal(d) && (
+                      <span style={{ display: 'block', fontSize: '0.72rem', color: d.bundle_complete === false ? '#f87171' : '#D4AF37' }}>
+                        🎁 Bundle: {bundleProducts(d).map((p) => p.name).join(' + ') || '—'}{d.bundle_complete === false && ' (a product was deleted — edit or delete this bundle)'}
+                      </span>
+                    )}</td>
+                    <td className="ep-old-price">{isBogoDeal(d) ? "—" : `${d.oldPrice} MAD`}</td>
+                    <td><span className="ep-discount">{isBogoDeal(d) ? offerShortLabel(d) : dealDiscount(d) !== null ? `-${dealDiscount(d)}%` : "—"}</span></td>
                     <td className="ep-price">{d.price} MAD</td>
                     <td className="ep-desc">{(typeof d.description === 'object' ? (d.description?.fr || '') : (d.description || '')).substring(0, 80) || '—'}</td>
                     <td className="ep-actions" onClick={(e) => e.stopPropagation()}>
                       <button className="ep-btn ep-btn-edit" onClick={() => navigate(`/dashboard/edit-products/deal-${d.id}`)}>Edit</button>
+                      <button className="ep-btn ep-btn-edit" title="Feature this deal in a homepage banner" onClick={() => navigate(`/dashboard/banners/new?deal=${d.id}`)}>Banner</button>
                       <button className="ep-btn ep-btn-delete" onClick={(e) => handleDeleteDeal(e, d.id)}>Delete</button>
                     </td>
                   </tr>

@@ -18,7 +18,7 @@ export default function DashboardHome() {
           api.getOrders()
         ]);
         setStats(statsData);
-        setRecentOrders(ordersData.slice(0, 4)); // Recent 4
+        setRecentOrders((Array.isArray(ordersData) ? ordersData : []).slice(0, 4)); // Recent 4
       } catch (err) {
         setError(err.message);
       } finally {
@@ -41,9 +41,10 @@ export default function DashboardHome() {
       <section className="dashboard-stats">
         <div className="stats-grid">
           <div className="stat-card">
-            <h3>This Month Sales</h3>
+            <h3>This Month Sales <small>(products)</small></h3>
             <p className="stat-number">{parseFloat(stats.month_sales || 0).toLocaleString()} MAD</p>
             <span className="stat-change positive">all time: {parseFloat(stats.total_sales || 0).toLocaleString()} MAD</span>
+            <span className="stat-change neutral">+ {parseFloat(stats.total_delivery_fees || 0).toLocaleString()} MAD delivery fees (not counted as sales)</span>
           </div>
           <div className="stat-card">
             <h3>Pending Orders</h3>

@@ -306,3 +306,81 @@
     grid-template-columns: 1fr 1fr;
   }
 }
+/* ── Delivery address, cable type and pack contents ── */
+.order-address-cell {
+  min-width: 200px;
+  max-width: 280px;
+}
+
+.order-address {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 6px;
+}
+
+.order-address-text {
+  white-space: pre-line;
+  word-break: break-word;
+  font-size: 0.85rem;
+  line-height: 1.4;
+  color: #eee;
+  user-select: all;
+}
+
+.copy-address-btn {
+  padding: 3px 10px;
+  border: 1px solid rgba(212, 175, 55, 0.5);
+  border-radius: 999px;
+  background: transparent;
+  color: #d4af37;
+  font-size: 0.75rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.15s ease;
+}
+
+.copy-address-btn:hover {
+  background: rgba(212, 175, 55, 0.12);
+}
+
+.copy-address-btn.copied {
+  border-color: #4ade80;
+  color: #4ade80;
+}
+
+.order-item-variant {
+  display: inline-block;
+  margin-inline-start: 6px;
+  padding: 0 7px;
+  border-radius: 999px;
+  background: rgba(212, 175, 55, 0.15);
+  color: #ffd700;
+  font-size: 0.75rem;
+  font-weight: 600;
+}
+
+.order-item-bundle {
+  margin: 2px 0 4px;
+  padding-inline-start: 6px;
+  border-inline-start: 2px solid rgba(212, 175, 55, 0.4);
+}
+
+.order-item-bundle-tag {
+  color: #d4af37;
+  font-size: 0.72rem;
+  font-weight: 700;
+}
+
+.order-item-bundle-line {
+  color: #aaa;
+  font-size: 0.78rem;
+}
+
+.order-total-split {
+  margin-top: 4px;
+  font-size: 0.75rem;
+  font-weight: 500;
+  color: #a9a9a9;
+  white-space: nowrap;
+}

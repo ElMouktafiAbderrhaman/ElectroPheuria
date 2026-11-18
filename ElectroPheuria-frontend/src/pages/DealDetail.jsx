@@ -3,13 +3,20 @@ import { createPortal } from "react-dom";
 import { useParams, useNavigate } from "react-router-dom";
 import { useTranslation } from "react-i18next";
 import { useCart } from "../context/CartContext";
+import api from "../services/api";
+import { dealDiscount, formatPrice, isDealActive, isBogoDeal, isBogoFixedDeal, isComingSoon, lineTotal, offerLabel, byAvailability } from "../utils/dealPricing";
+import { ComingSoonNotice, ComingSoonOverlay } from "../Components/ComingSoon";
+import { trackAddToCart, trackViewContent } from "../utils/fbPixel";
+import { isBundleDeal, bundleProducts, bundleItemImage, bundleItemKey, bundleCableItems, bundleChoicesComplete, bundleCartItem, variantImage, variantLabel } from "../utils/variants";
+import { cartLineKey } from "../context/CartContext";
+import "../Components/VariantPicker.css";
 import "./ProductDetail.css";
 import "./DealDetail.css";
 
 export default function DealDetail() {
   const { id } = useParams();
   const navigate = useNavigate();
-  const { addToCart } = useCart();
+  const { cart, addToCart } = useCart();
   const { t, i18n } = useTranslation();
 
   // Helper: get localized text from multi-lang object or old string
@@ -18,31 +25,40 @@ export default function DealDetail() {
     if (typeof field === 'object') return field[i18n.language] || field.fr || '';
     return field;
   };
-  
-  const [deal] = useState(() => {
-    const saved = localStorage.getItem("ElectroPheuria_deals");
-    if (saved) {
-      const deals = JSON.parse(saved);
-      return deals.find(d => String(d.id) === id);
-    }
-    return null;
-  });
 
-  const allDeals = useMemo(() => {
-    try {
-      return JSON.parse(localStorage.getItem("ElectroPheuria_deals") || "[]");
-    } catch { return []; }
-  }, []);
+  const [deal, setDeal] = useState(null);
+  const [allDeals, setAllDeals] = useState([]);
+  const [loadingDeal, setLoadingDeal] = useState(true);
+  // Pack: cable type chosen for each pack product with variants, {productId: variantId}.
+  const [packCables, setPackCables] = useState({});
+  const [packCableError, setPackCableError] = useState(false);
+  const packPickerRef = useRef(null);
+  useEffect(() => {
+    api.getDeal(id)
+      .then(d => {
+        setDeal(d);
+        setPackCables({});
+        setPackCableError(false);
+        setLoadingDeal(false);
+        if (d?.id) trackViewContent({ ...d, isDeal: true });
+      })
+      .catch(() => {
+        setDeal(null);
+        setLoadingDeal(false);
+      });
+    api.getDeals().then(setAllDeals).catch(() => {});
+  }, [id]);
 
   const similarDeals = useMemo(() => {
     if (!deal) return [];
     const dealCategories = deal.categories || (deal.category ? [deal.category] : []);
     return allDeals
       .filter(d => {
-        if (String(d.id) === id) return false;
+        if (String(d.id) === id || !isDealActive(d)) return false;
         const dCats = d.categories || (d.category ? [d.category] : []);
         return dCats.some(c => dealCategories.includes(c));
       })
+      .sort(byAvailability())
       .slice(0, 6);
   }, [allDeals, deal, id]);
 
@@ -64,8 +80,20 @@ export default function DealDetail() {
   }, []);
 
   const handleAddToCart = () => {
-    if (deal && deal.stock > 0) {
-      addToCart(deal, 1);
+    if (deal && deal.stock > 0 && !isComingSoon(deal) && deal.bundle_complete !== false) {
+      // A pack with a cable product can only be added once every cable type is chosen.
+      if (!bundleChoicesComplete(deal, packCables)) {
+        setPackCableError(true);
+        packPickerRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        return;
+      }
+      const item = bundleCartItem(deal, packCables);
+      const inCart = cart.find((c) => cartLineKey(c) === cartLineKey(item));
+      const qtyBefore = inCart?.quantity || 0;
+      const qtyAfter = Math.min(qtyBefore + 1, item.stock || 999);
+      addToCart(item, 1);
+      // Only report units that were really added (the cart caps quantity at stock).
+      if (qtyAfter > qtyBefore) trackAddToCart(item, qtyAfter - qtyBefore, qtyBefore);
       navigate('/cart');
     }
   };
@@ -119,6 +147,17 @@ export default function DealDetail() {
 
   const images = deal?.images || [deal?.image].filter(Boolean) || [];
 
+  if (loadingDeal) {
+    return (
+      <div className="product-detail-main">
+        <div className="product-detail-loading">
+          <div className="detail-spinner"></div>
+          <p>Chargement du produit...</p>
+        </div>
+      </div>
+    );
+  }
+
   if (!deal) {
     return (
       <div className="product-detail-main">
@@ -132,7 +171,13 @@ export default function DealDetail() {
     );
   }
 
-  const finalPrice = deal?.price;
+  const finalPrice = formatPrice(deal?.price);
+  const comingSoon = isComingSoon(deal);
+  const isBundle = isBundleDeal(deal);
+  const packItems = bundleProducts(deal);
+  const unavailable = comingSoon || deal.stock <= 0 || deal.bundle_complete === false;
+  const buyLabel = comingSoon ? t("comingSoon") : deal.stock <= 0 ? t("soldOut") : t("addToCart");
+  const buyClass = comingSoon ? " coming-soon-btn" : deal.stock <= 0 ? " disabled-btn" : "";
 
   return (
     <>
@@ -144,8 +189,8 @@ export default function DealDetail() {
               onTouchStart={handleTouchStart}
               onTouchEnd={handleTouchEnd}
             >
-              <img 
-                src={images[currentImageIndex]} 
+              <img
+                src={images[currentImageIndex]}
                 alt={deal.name}
                 className={`main-detail-image ${isSlideAnimating ? `slide-${slideDirection}` : 'slide-reset'}`}
               />
@@ -195,14 +240,84 @@ export default function DealDetail() {
           </div>
 
           <div className="detail-info">
-            <span className="deal-hot-badge">{t("hotDeal")}</span>
+            <span className="deal-hot-badge">{isBundle ? `🎁 ${t("bundleDeal")}` : t("hotDeal")}</span>
             <h1 className="product-title">{deal.name}</h1>
-            
+
             <div className="price-section-deal">
-              <span className="detail-price-deal">{deal.price} MAD</span>
-              <span className="old-price-deal">{deal.oldPrice} MAD</span>
-              <span className="discount-badge-deal">-{deal.discount}%</span>
+              <span className="detail-price-deal">{formatPrice(deal.price)} MAD</span>
+              {isBogoDeal(deal) && <span className="bogo-unit">{t("bogoUnit")}</span>}
+              {Number(deal.oldPrice) > Number(deal.price) && (
+                <span className="old-price-deal">{formatPrice(deal.oldPrice)} MAD</span>
+              )}
+              {dealDiscount(deal) !== null && (
+                <span className="discount-badge-deal">-{dealDiscount(deal)}%</span>
+              )}
             </div>
+
+            {isBundle && (
+              <div className="bundle-detail-box">
+                <strong className="bundle-detail-title">{t("bundleIncludes")}</strong>
+                <ul className="bundle-detail-items">
+                  {packItems.map((p, i) => (
+                    <li key={bundleItemKey(p)} className="bundle-detail-item">
+                      {i > 0 && <span className="bundle-detail-plus" aria-hidden="true">+</span>}
+                      {bundleItemImage(p) ? <img src={bundleItemImage(p)} alt="" /> : <span className="bundle-detail-noimg">📦</span>}
+                      <span className="bundle-detail-name"><bdi>{p.name}</bdi>{p.quantity > 1 && ` ×${p.quantity}`}</span>
+                      <span className="bundle-detail-price" dir="ltr">{formatPrice(p.price * (p.quantity || 1))} MAD</span>
+                    </li>
+                  ))}
+                </ul>
+                <div className="bundle-detail-total">
+                  <span>{t("bundleSeparately")}: <s dir="ltr">{formatPrice(deal.oldPrice)} MAD</s></span>
+                  <span className="bundle-detail-pack">{t("bundleBoth")}: <b dir="ltr">{formatPrice(deal.price)} MAD</b></span>
+                </div>
+                {deal.bundle_complete === false && <p className="bundle-detail-unavailable">{t("bundleUnavailable")}</p>}
+              </div>
+            )}
+
+            {isBundle && !unavailable && bundleCableItems(deal).map((p) => (
+              <div key={`cable-${p.id}`} className={`variant-picker${packCableError && !packCables[p.id] ? ' has-error' : ''}`} ref={packPickerRef}>
+                <h3 className="variant-picker-title">{t("chooseCableType")} — <bdi>{p.name}</bdi></h3>
+                <div className="variant-options" role="radiogroup" aria-label={t("cableType")}>
+                  {p.variants.map((v) => {
+                    const out = Number(v.stock) <= 0;
+                    const selected = String(packCables[p.id]) === String(v.id);
+                    return (
+                      <button
+                        key={v.id}
+                        type="button"
+                        role="radio"
+                        aria-checked={selected}
+                        disabled={out}
+                        className={`variant-option${selected ? ' selected' : ''}${out ? ' out' : ''}`}
+                        onClick={() => { if (!out) { setPackCables((prev) => ({ ...prev, [p.id]: v.id })); setPackCableError(false); } }}
+                      >
+                        {variantImage(v) && <img src={variantImage(v)} alt="" className="variant-option-img" />}
+                        <span className="variant-option-name" dir="ltr">{variantLabel(v)}</span>
+                        {out && <span className="variant-option-out">{t("variantOutOfStock")}</span>}
+                        {selected && <span className="variant-option-check" aria-hidden="true">✓</span>}
+                      </button>
+                    );
+                  })}
+                </div>
+                {packCableError && !packCables[p.id] && <p className="variant-error" role="alert">{t("chooseCableTypeError")}</p>}
+              </div>
+            ))}
+
+            {isBogoDeal(deal) && (
+              <div className="bogo-detail-box">
+                <strong className="bogo-detail-title">🎁 {offerLabel(deal, t)}</strong>
+                <p>{isBogoFixedDeal(deal) ? t("bogoFixedExplain", { price: formatPrice(deal.second_item_price) }) : t("bogoExplain")}</p>
+                <div className="bogo-detail-examples">
+                  {[2, 4].map((q) => (
+                    <span key={q}>
+                      {q} × {formatPrice(deal.price)} = <s>{formatPrice(lineTotal({ ...deal, quantity: q }).subtotal)}</s>{" "}
+                      <b>{formatPrice(lineTotal({ ...deal, quantity: q }).total)} MAD</b>
+                    </span>
+                  ))}
+                </div>
+              </div>
+            )}
 
               {deal.category && (
                 <div className="stock-info">
@@ -210,7 +325,9 @@ export default function DealDetail() {
                 </div>
               )}
 
-              {deal.stock <= 0 && (
+              {comingSoon && <ComingSoonNotice />}
+
+              {!comingSoon && (deal.stock <= 0 || deal.bundle_complete === false) && (
                 <div className="stock-info">
                   <span className="sold-out-detail-badge">{t("soldOut")}</span>
                 </div>
@@ -222,8 +339,8 @@ export default function DealDetail() {
               </div>
 
             <div className="add-to-cart-row">
-              <button onClick={handleAddToCart} className={`detail-add-to-cart${deal.stock <= 0 ? ' disabled-btn' : ''}`} disabled={deal.stock <= 0}>
-                {deal.stock <= 0 ? t("soldOut") : t("addToCart")}
+              <button onClick={handleAddToCart} className={`detail-add-to-cart${buyClass}`} disabled={unavailable}>
+                {buyLabel}
               </button>
               <button onClick={goBack} className="detail-back-button">
                 {t("backToProducts")}
@@ -254,9 +371,9 @@ export default function DealDetail() {
                 gItem.image && (
                   <div key={index} className="gallery-block">
                     <div className="gallery-image-wrapper">
-                      <img 
-                        src={gItem.image} 
-                        alt={`${deal.name} - ${index + 1}`} 
+                      <img
+                        src={gItem.image}
+                        alt={`${deal.name} - ${index + 1}`}
                         className="gallery-full-image"
                       />
                       <span className="gallery-image-number">{index + 1} / {deal.gallery.length}</span>
@@ -280,9 +397,9 @@ export default function DealDetail() {
             <p className="similar-subtitle">{t("similarSubtitle")}</p>
             <div className="similar-products-grid">
               {similarDeals.map((item) => (
-                <div 
-                  key={item.id} 
-                  className={`similar-product-card${item.stock <= 0 ? ' sold-out-card' : ''}`}
+                <div
+                  key={item.id}
+                  className={`similar-product-card${isComingSoon(item) ? ' coming-soon-card' : item.stock <= 0 ? ' sold-out-card' : ''}`}
                   onClick={() => {
                     navigate(`/deal/${item.id}`);
                     window.scrollTo({ top: 0, behavior: 'smooth' });
@@ -294,7 +411,7 @@ export default function DealDetail() {
                     ) : (
                       <div className="image-placeholder">📦</div>
                     )}
-                    {item.stock <= 0 && (
+                    {isComingSoon(item) ? <ComingSoonOverlay compact /> : item.stock <= 0 && (
                       <div className="sold-out-overlay">
                         <span className="sold-out-badge">{t("soldOut")}</span>
                       </div>
@@ -303,8 +420,8 @@ export default function DealDetail() {
                   <div className="similar-product-info">
                     <h4>{item.name}</h4>
                     <div className="similar-deal-prices">
-                      <span className="similar-product-price">{item.price} MAD</span>
-                      {item.oldPrice && <span className="similar-old-price">{item.oldPrice} MAD</span>}
+                      <span className="similar-product-price">{formatPrice(item.price)} MAD</span>
+                      {Number(item.oldPrice) > Number(item.price) && <span className="similar-old-price">{formatPrice(item.oldPrice)} MAD</span>}
                     </div>
                   </div>
                 </div>
@@ -320,9 +437,9 @@ export default function DealDetail() {
           <button onClick={goBack} className="sticky-back-btn" aria-label={t("backToProducts")}>
             ←
           </button>
-          <span className="sticky-price">{finalPrice} MAD</span>
-          <button onClick={handleAddToCart} className={`sticky-add-to-cart${deal.stock <= 0 ? ' disabled-btn' : ''}`} disabled={deal.stock <= 0}>
-            {deal.stock <= 0 ? t("soldOut") : t("addToCart")}
+          <span className="sticky-price" dir="ltr">{finalPrice} MAD</span>
+          <button onClick={handleAddToCart} className={`sticky-add-to-cart${buyClass}`} disabled={unavailable}>
+            {buyLabel}
           </button>
         </div>,
         document.body

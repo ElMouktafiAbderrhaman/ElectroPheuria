@@ -1,0 +1,165 @@
+/* ── "Coming soon" product cards and detail page ── */
+
+.coming-soon-card {
+  position: relative;
+  border-color: rgba(212, 175, 55, 0.75) !important;
+  box-shadow: 0 0 0 1px rgba(212, 175, 55, 0.25), 0 10px 35px rgba(212, 175, 55, 0.18) !important;
+}
+
+.coming-soon-card .product-image img,
+.coming-soon-card .similar-product-image img {
+  filter: brightness(0.55) saturate(0.85);
+  transition: filter 0.4s ease;
+}
+
+.coming-soon-card:hover .product-image img,
+.coming-soon-card:hover .similar-product-image img {
+  filter: brightness(0.75) saturate(1);
+}
+
+/* The real price is still shown, but softened: it is not buyable yet. */
+.coming-soon-card .new-price,
+.coming-soon-card .price,
+.coming-soon-card .similar-product-price {
+  opacity: 0.75;
+}
+
+.coming-soon-overlay {
+  position: absolute;
+  inset: 0;
+  z-index: 3;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+  pointer-events: none;
+  background: radial-gradient(ellipse at center, rgba(0, 0, 0, 0.15) 0%, rgba(0, 0, 0, 0.55) 100%);
+}
+
+.coming-soon-center {
+  max-width: 86%;
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  padding: 14px 22px;
+  border: 1px solid rgba(255, 215, 0, 0.55);
+  border-radius: 16px;
+  background: rgba(10, 10, 10, 0.62);
+  backdrop-filter: blur(6px);
+  -webkit-backdrop-filter: blur(6px);
+  box-shadow: 0 8px 30px rgba(0, 0, 0, 0.5), inset 0 0 20px rgba(212, 175, 55, 0.12);
+  animation: coming-soon-glow 2.6s ease-in-out infinite;
+  text-align: center;
+}
+
+.coming-soon-icon {
+  font-size: 1.5rem;
+  line-height: 1;
+}
+
+.coming-soon-title {
+  font-family: 'Montserrat', sans-serif;
+  font-weight: 800;
+  font-size: 1.05rem;
+  letter-spacing: 1px;
+  text-transform: uppercase;
+  color: #FFD700;
+  text-shadow: 0 0 14px rgba(255, 215, 0, 0.45);
+}
+
+[dir="rtl"] .coming-soon-title {
+  letter-spacing: 0;
+}
+
+.coming-soon-sub {
+  font-size: 0.75rem;
+  color: #e6e6e6;
+}
+
+.coming-soon-overlay.compact .coming-soon-center {
+  padding: 8px 12px;
+  gap: 2px;
+}
+
+.coming-soon-overlay.compact .coming-soon-icon {
+  font-size: 1.1rem;
+}
+
+.coming-soon-overlay.compact .coming-soon-title {
+  font-size: 0.75rem;
+}
+
+@keyframes coming-soon-glow {
+  0%, 100% { box-shadow: 0 8px 30px rgba(0, 0, 0, 0.5), 0 0 0 rgba(255, 215, 0, 0); }
+  50% { box-shadow: 0 8px 30px rgba(0, 0, 0, 0.5), 0 0 22px rgba(255, 215, 0, 0.35); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .coming-soon-center { animation: none; }
+}
+
+/* Detail page notice + disabled buy buttons */
+.coming-soon-notice {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  margin: 16px 0;
+  padding: 14px 16px;
+  border: 1px solid rgba(255, 215, 0, 0.5);
+  border-radius: 14px;
+  background: linear-gradient(135deg, rgba(212, 175, 55, 0.14), rgba(212, 175, 55, 0.04));
+}
+
+.coming-soon-notice strong {
+  display: block;
+  color: #FFD700;
+  font-size: 1rem;
+  margin-bottom: 2px;
+}
+
+.coming-soon-notice p {
+  margin: 0;
+  color: #ddd;
+  font-size: 0.9rem;
+  line-height: 1.5;
+}
+
+.detail-add-to-cart.coming-soon-btn,
+.sticky-add-to-cart.coming-soon-btn {
+  background: transparent !important;
+  color: #FFD700 !important;
+  border: 2px dashed rgba(255, 215, 0, 0.7) !important;
+  box-shadow: none !important;
+  cursor: not-allowed;
+  transform: none !important;
+}
+
+.coming-soon-card .product-image,
+.coming-soon-card .similar-product-image {
+  position: relative;
+  overflow: hidden;
+}
+
+/* Phones: cards are in a narrow 2-column grid — keep the badge small and below the top stickers. */
+@media (max-width: 600px) {
+  .coming-soon-overlay {
+    padding-top: 34px;
+  }
+  .coming-soon-center {
+    padding: 8px 12px;
+    gap: 2px;
+    border-radius: 12px;
+  }
+  .coming-soon-icon {
+    font-size: 1.1rem;
+  }
+  .coming-soon-title {
+    font-size: 0.78rem;
+    letter-spacing: 0.5px;
+  }
+  .coming-soon-sub {
+    display: none;
+  }
+}

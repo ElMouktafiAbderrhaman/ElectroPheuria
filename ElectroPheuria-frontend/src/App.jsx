@@ -1,5 +1,10 @@
 // src/App.jsx
-import { BrowserRouter as Router, Routes, Route, useLocation } from "react-router-dom";
+import {
+  BrowserRouter as Router,
+  Routes,
+  Route,
+  useLocation,
+} from "react-router-dom";
 import { useState, useEffect } from "react";
 import api from "./services/api.js";
 
@@ -14,7 +19,6 @@ import Info from "./pages/Info";
 import Footer from "./Components/Footer";
 import ScrollToTop from "./Components/ScrollToTop";
 
-
 import DashboardLayout from "./Dashboard/DashboardLayout";
 import DashboardHome from "./Dashboard/Pages/DashboardHome";
 import AddProduct from "./Dashboard/Pages/AddProducts";
@@ -24,6 +28,9 @@ import Clients from "./Dashboard/Pages/Clients";
 import EditProductsList from "./Dashboard/Pages/EditProductsList";
 import EditProductDetail from "./Dashboard/Pages/EditProductDetail";
 import DashboardLogin from "./Dashboard/Pages/DashboardLogin";
+import Banners from "./Dashboard/Pages/Banners";
+import BannerEditor from "./Dashboard/Pages/BannerEditor";
+import Tracker from "./Dashboard/Pages/Tracker";
 import ResetPassword from "./Dashboard/Pages/ResetPassword";
 import ClientDashboard from "./pages/ClientDashboard";
 import ProtectedRoute from "./Dashboard/components/ProtectedRoute";
@@ -40,72 +47,40 @@ function ConditionalFooter() {
   return <Footer />;
 }
 
-// Safe localStorage getter with error handling
-const getSafeStorage = (key, defaultValue) => {
-  try {
-    const saved = localStorage.getItem(key);
-    if (saved) {
-      const parsed = JSON.parse(saved);
-      // Verify it's an array
-      if (Array.isArray(parsed)) {
-        return parsed;
-      }
-    }
-  } catch (e) {
-    console.error(`Error reading ${key} from localStorage:`, e);
-    // Clear corrupted data
-    try {
-      localStorage.removeItem(key);
-    } catch (clearError) {
-      console.error(`Error clearing ${key}:`, clearError);
-    }
-  }
-  return defaultValue;
-};
-
 export default function App() {
   const [products, setProducts] = useState([]);
   const [deals, setDeals] = useState([]);
 
-  // Load products and deals from the database on startup
-  useEffect(() => {
-    api.getProducts()
-      .then((data) => {
-        setProducts(data);
-        localStorage.setItem("ElectroPheuria_products", JSON.stringify(data));
-      })
-      .catch((e) => {
-        console.error("Failed to load products from DB, falling back to localStorage:", e);
-        setProducts(getSafeStorage("ElectroPheuria_products", []));
-      });
+  // 🔥 refresh deals (used after create/edit/delete)
+  const refreshDeals = async () => {
+    try {
+      const data = await api.getDeals();
+      setDeals(data || []);
+    } catch (err) {
+      console.error("Failed to refresh deals", err);
+    }
+  };
 
-    api.getDeals()
-      .then((data) => {
-        setDeals(data);
-        localStorage.setItem("ElectroPheuria_deals", JSON.stringify(data));
-      })
-      .catch((e) => {
-        console.error("Failed to load deals from DB, falling back to localStorage:", e);
-        setDeals(getSafeStorage("ElectroPheuria_deals", []));
-      });
+  // 🚀 load everything from API ONLY (no localStorage)
+  useEffect(() => {
+    const loadData = async () => {
+      try {
+        const productsData = await api.getProducts();
+        setProducts(productsData || []);
+      } catch (error) {
+        console.error("Products API failed:", error);
+      }
+
+      try {
+        const dealsData = await api.getDeals();
+        setDeals(dealsData || []);
+      } catch (error) {
+        console.error("Deals API failed:", error);
+      }
+    };
+
+    loadData();
   }, []);
-
-  // Save to localStorage when state changes
-  useEffect(() => {
-    try {
-      localStorage.setItem("ElectroPheuria_products", JSON.stringify(products));
-    } catch (e) {
-      console.error("Error saving products:", e);
-    }
-  }, [products]);
-
-  useEffect(() => {
-    try {
-      localStorage.setItem("ElectroPheuria_deals", JSON.stringify(deals));
-    } catch (e) {
-      console.error("Error saving deals:", e);
-    }
-  }, [deals]);
 
   return (
     <Router>
@@ -114,7 +89,7 @@ export default function App() {
 
       <div className="app-container">
         <Routes>
-          {/* Public pages */}
+          {/* Public */}
           <Route path="/" element={<Home />} />
           <Route path="/products" element={<Products />} />
           <Route path="/cart" element={<Cart />} />
@@ -123,23 +98,24 @@ export default function App() {
           <Route path="/deal/:id" element={<DealDetail />} />
           <Route path="/info" element={<Info />} />
 
-          {/* Dashboard login */}
+          {/* Auth */}
           <Route path="/dashboard/login" element={<DashboardLogin />} />
           <Route path="/dashboard/reset-password" element={<ResetPassword />} />
 
-          {/* Client Dashboard */}
+          {/* Client */}
           <Route path="/client" element={<ClientDashboard />} />
 
-          {/* Admin Dashboard */}
-          <Route 
-            path="/dashboard" 
+          {/* Dashboard */}
+          <Route
+            path="/dashboard"
             element={
               <ProtectedRoute>
-                <DashboardLayout 
-                  products={products} 
+                <DashboardLayout
+                  products={products}
                   setProducts={setProducts}
                   deals={deals}
                   setDeals={setDeals}
+                  refreshDeals={refreshDeals}
                 />
               </ProtectedRoute>
             }
@@ -149,6 +125,11 @@ export default function App() {
             <Route path="orders" element={<Orders />} />
             <Route path="clients" element={<Clients />} />
             <Route path="sales" element={<SalesHistory />} />
+            <Route path="banners" element={<Banners />} />
+            <Route path="banners/new" element={<BannerEditor />} />
+            <Route path="banners/:id" element={<BannerEditor />} />
+            <Route path="tracker" element={<Tracker />} />
+
             <Route path="edit-products">
               <Route index element={<EditProductsList />} />
               <Route path=":id" element={<EditProductDetail />} />
@@ -161,4 +142,3 @@ export default function App() {
     </Router>
   );
 }
-

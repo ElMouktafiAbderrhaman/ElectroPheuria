@@ -1,6 +1,7 @@
 // src/pages/SalesHistory.jsx
 import { useState, useEffect } from "react";
 import api from '../../services/api.js';
+import { orderAmounts } from "../../utils/dealPricing";
 import "./SalesHistory.css";
 
 const MONTH_NAMES = [
@@ -34,7 +35,9 @@ export default function SalesHistory() {
     : sales;
 
   const shippedSales = filteredSales.filter(s => s.status === 'shipped');
-  const filteredTotal = shippedSales.reduce((sum, s) => sum + parseFloat(s.total_price || 0), 0);
+  // Sales = product revenue; delivery fees are passed on to the courier and shown apart.
+  const filteredTotal = shippedSales.reduce((sum, s) => sum + orderAmounts(s).products, 0);
+  const filteredDelivery = shippedSales.reduce((sum, s) => sum + orderAmounts(s).delivery, 0);
   const yearTotal = monthlyData?.months?.reduce((sum, m) => sum + m.sales, 0) || 0;
 
   if (loading) return <div className="loading">Loading sales...</div>;
@@ -84,6 +87,7 @@ export default function SalesHistory() {
         <div className="summary-card">
           <h3>{selectedMonth !== null ? MONTH_NAMES[selectedMonth] : 'All Time'} Sales</h3>
           <p className="summary-number">{filteredTotal.toLocaleString()} MAD</p>
+          <p className="sale-total-split">products only · + {filteredDelivery.toLocaleString()} MAD delivery fees</p>
         </div>
         <div className="summary-card">
           <h3>Transactions</h3>
@@ -102,6 +106,8 @@ export default function SalesHistory() {
             <tr>
               <th>Order ID</th>
               <th>Customer</th>
+              <th>City</th>
+              <th>Delivery Address</th>
               <th>Products</th>
               <th>Total</th>
               <th>Date</th>
@@ -112,15 +118,27 @@ export default function SalesHistory() {
             {filteredSales.map((sale, index) => (
               <tr key={index} className="sale-row">
                 <td>{sale.id}</td>
-                <td>{sale.client?.name || "N/A"}</td>
-                <td>{Array.isArray(sale.products) ? sale.products.map(p => p.name || p.title).join(", ") : "N/A"}</td>
-                <td className="price-amount">{Number(sale.total_price || 0).toLocaleString()} MAD</td>
+                <td>{sale.client_data?.name || sale.client?.name || "N/A"}</td>
+                <td>{sale.client_data?.city || sale.client_data?.address || sale.client?.address || "N/A"}</td>
+                <td className="sale-address" dir="auto">{sale.delivery_address || sale.client_data?.delivery_address || "—"}</td>
+                <td>{Array.isArray(sale.products) ? sale.products.map(p => {
+                  const base = p.name || p.title;
+                  if (p.variant_label) return `${base} (${p.variant_label})`;
+                  if (Array.isArray(p.bundle_items) && p.bundle_items.length) return `${base} [Pack: ${p.bundle_items.map(b => b.variant_label ? `${b.name} (${b.variant_label})` : b.name).join(" + ")}]`;
+                  return base;
+                }).join(", ") : "N/A"}</td>
+                <td className="price-amount">
+                  {orderAmounts(sale).total.toLocaleString()} MAD
+                  {orderAmounts(sale).delivery > 0 && (
+                    <div className="sale-total-split">{orderAmounts(sale).products.toLocaleString()} + {orderAmounts(sale).delivery.toLocaleString()} delivery</div>
+                  )}
+                </td>
                 <td>{sale.created_at ? new Date(sale.created_at).toLocaleDateString() : "N/A"}</td>
                 <td><span className={`status-badge status-${sale.status}`}>{sale.status}</span></td>
               </tr>
             ))}
             {filteredSales.length === 0 && (
-              <tr><td colSpan="6" style={{textAlign: 'center', padding: '20px', color: '#888'}}>No sales for this period</td></tr>
+              <tr><td colSpan="8" style={{textAlign: 'center', padding: '20px', color: '#888'}}>No sales for this period</td></tr>
             )}
           </tbody>
         </table>

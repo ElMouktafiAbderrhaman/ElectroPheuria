@@ -443,3 +443,34 @@
   }
 }
 
+
+/* Products subtotal + delivery fee = amount to pay */
+.cart-total p.cart-breakdown {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  font-size: 1rem;
+  font-weight: 500;
+  color: #dcdcdc;
+  padding: 4px 0;
+}
+
+.cart-total p.cart-grand-total {
+  margin-top: 10px;
+  padding-top: 12px;
+  border-top: 2px solid #FFD700;
+}
+
+.cart-qty-words {
+  color: #FFD700;
+}
+
+.cart-total p.cart-breakdown {
+  text-align: start;
+  align-items: baseline;
+}
+
+.cart-total p.cart-breakdown > span {
+  flex: none;
+  white-space: nowrap;
+}

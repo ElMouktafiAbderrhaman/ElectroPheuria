@@ -238,3 +238,16 @@
     font-size: 0.8rem;
   }
 }
+.sale-address {
+  max-width: 240px;
+  white-space: pre-line;
+  word-break: break-word;
+  font-size: 0.85rem;
+}
+
+.sale-total-split {
+  margin-top: 4px;
+  font-size: 0.75rem;
+  font-weight: 500;
+  color: #a9a9a9;
+}

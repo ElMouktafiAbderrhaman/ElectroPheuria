@@ -1,0 +1,192 @@
+/* BannerCarousel.css — homepage promotional carousel */
+
+.bc {
+  position: relative;
+  max-width: 1400px;
+  margin: 0 auto 70px;
+  padding: 0 clamp(0px, 2vw, 24px);
+  touch-action: pan-y;
+}
+
+/* All slides share one grid cell, so the stage is as tall as the tallest banner
+   and slides can cross-fade without absolute positioning. */
+.bc-stage {
+  display: grid;
+}
+.bc-slide {
+  grid-area: 1 / 1;
+  display: flex;
+  opacity: 0;
+  visibility: hidden;
+  transform: translateX(6%) scale(0.98);
+  transition:
+    opacity 0.7s cubic-bezier(0.4, 0, 0.2, 1),
+    transform 0.8s cubic-bezier(0.2, 0.8, 0.2, 1),
+    visibility 0s linear 0.8s;
+  pointer-events: none;
+}
+.bc-slide.is-before {
+  transform: translateX(-6%) scale(0.98);
+}
+.bc[dir="rtl"] .bc-slide {
+  transform: translateX(-6%) scale(0.98);
+}
+.bc[dir="rtl"] .bc-slide.is-before {
+  transform: translateX(6%) scale(0.98);
+}
+.bc .bc-slide.is-active {
+  opacity: 1;
+  visibility: visible;
+  transform: none;
+  transition-delay: 0s;
+  pointer-events: auto;
+  z-index: 1;
+}
+.bc-slide .pb-wrap,
+.bc-slide .pb {
+  height: 100%;
+}
+
+/* Arrows sit on the banner edges (logical, so they swap sides in Arabic). */
+.bc-arrow {
+  position: absolute;
+  top: 50%;
+  z-index: 3;
+  width: 44px;
+  height: 44px;
+  margin-top: -22px;
+  display: grid;
+  place-items: center;
+  border-radius: 50%;
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  background: rgba(10, 10, 12, 0.6);
+  color: #fff;
+  backdrop-filter: blur(8px);
+  cursor: pointer;
+  opacity: 0;
+  transition: opacity 0.3s ease, background 0.25s ease, transform 0.25s ease;
+}
+.bc-arrow svg {
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 2.4;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+.bc[dir="rtl"] .bc-arrow svg {
+  transform: scaleX(-1);
+}
+.bc-arrow--prev { inset-inline-start: clamp(-6px, 0.5vw, 8px); }
+.bc-arrow--next { inset-inline-end: clamp(-6px, 0.5vw, 8px); }
+.bc:hover .bc-arrow,
+.bc-arrow:focus-visible {
+  opacity: 1;
+}
+.bc-arrow:hover {
+  background: #FFD447;
+  color: #0b0b0d;
+  transform: scale(1.06);
+}
+.bc-arrow:focus-visible,
+.bc-dot:focus-visible {
+  outline: 2px solid #FFD447;
+  outline-offset: 3px;
+}
+
+/* Pagination: the active dot stretches into a progress bar for the rotation timer. */
+.bc-dots {
+  display: flex;
+  justify-content: center;
+  gap: 8px;
+  margin-top: 16px;
+}
+.bc-dot {
+  position: relative;
+  width: 8px;
+  height: 8px;
+  padding: 0;
+  border: 0;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.22);
+  overflow: hidden;
+  cursor: pointer;
+  transition: width 0.4s ease, background 0.3s ease;
+}
+body.light-mode .bc-dot {
+  background: rgba(0, 0, 0, 0.18);
+}
+.bc-dot:hover {
+  background: rgba(255, 212, 71, 0.5);
+}
+.bc-dot.is-active {
+  width: 36px;
+}
+.bc-dot span {
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  background: #FFD447;
+  transform: scaleX(0);
+  transform-origin: left;
+}
+.bc[dir="rtl"] .bc-dot span {
+  transform-origin: right;
+}
+.bc-dot.is-active span {
+  animation: bcProgress var(--bc-ms, 6000ms) linear forwards;
+}
+.bc-dot.is-paused span {
+  animation-play-state: paused;
+}
+@keyframes bcProgress {
+  to { transform: scaleX(1); }
+}
+
+/* Loading skeleton keeps the layout from jumping when banners arrive. */
+.bc-skeleton {
+  height: clamp(300px, 36vw, 470px);
+  border-radius: clamp(18px, 2.6vw, 30px);
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  background:
+    linear-gradient(100deg, transparent 30%, rgba(255, 255, 255, 0.05) 50%, transparent 70%) 0 0 / 200% 100%,
+    #0f0f11;
+  animation: bcShimmer 1.4s linear infinite;
+}
+@keyframes bcShimmer {
+  to { background-position: -200% 0, 0 0; }
+}
+
+@media (hover: none) {
+  .bc-arrow {
+    opacity: 1;
+    width: 36px;
+    height: 36px;
+    margin-top: -18px;
+  }
+}
+@media (max-width: 640px) {
+  .bc {
+    margin-bottom: 48px;
+  }
+  .bc-arrow {
+    top: auto;
+    bottom: 0;
+    margin-top: 0;
+  }
+  .bc-dots {
+    min-height: 36px;
+    align-items: center;
+    margin-top: 10px;
+  }
+  .bc-arrow--prev { inset-inline-start: 12px; }
+  .bc-arrow--next { inset-inline-end: 12px; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .bc-slide {
+    transition: opacity 0.2s linear, visibility 0s linear 0.2s;
+    transform: none !important;
+  }
+  .bc-skeleton {
+    animation: none;
+  }
+}

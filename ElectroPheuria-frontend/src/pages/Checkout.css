@@ -166,7 +166,7 @@
 }
 
 .summary-items {
-  max-height: 300px;
+  max-height: 420px;
   overflow-y: auto;
   margin-bottom: 20px;
 }
@@ -302,6 +302,97 @@
   font-size: 0.8rem;
   margin-top: -8px;
   padding-left: 4px;
+}
+
+/* Searchable city selector */
+.city-select {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+}
+
+.city-select-input {
+  width: 100%;
+  box-sizing: border-box;
+  padding-right: 44px;
+}
+
+.city-select-check {
+  position: absolute;
+  right: 18px;
+  top: 50%;
+  transform: translateY(-50%);
+  color: var(--gold-main);
+  font-weight: 700;
+  pointer-events: none;
+}
+
+[dir="rtl"] .city-select-input {
+  padding-right: 20px;
+  padding-left: 44px;
+}
+
+[dir="rtl"] .city-select-check {
+  right: auto;
+  left: 18px;
+}
+
+.city-select-list {
+  position: absolute;
+  top: calc(100% + 6px);
+  left: 0;
+  right: 0;
+  z-index: 50;
+  max-height: 230px;
+  overflow-y: auto;
+  margin: 0;
+  padding: 6px;
+  list-style: none;
+  background: #141414;
+  border: 1px solid rgba(212, 175, 55, 0.45);
+  border-radius: 16px;
+  box-shadow: 0 12px 30px rgba(0, 0, 0, 0.6);
+  -webkit-overflow-scrolling: touch;
+}
+
+.city-select-list.drop-up {
+  top: auto;
+  bottom: calc(100% + 6px);
+}
+
+.city-select-option {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  padding: 11px 14px;
+  border-radius: 10px;
+  cursor: pointer;
+  color: #f5f5f5;
+  font-size: 0.95rem;
+  min-height: 44px;
+  box-sizing: border-box;
+}
+
+.city-select-option.active {
+  background: rgba(212, 175, 55, 0.15);
+}
+
+.city-select-option.selected .city-select-name {
+  color: var(--gold-light);
+  font-weight: 600;
+}
+
+.city-select-alt {
+  color: #9a9a9a;
+  font-size: 0.85rem;
+  white-space: nowrap;
+}
+
+.city-select-empty {
+  padding: 12px 14px;
+  color: #bbb;
+  font-size: 0.9rem;
 }
 
 .checkout-input-disabled {
@@ -514,4 +605,386 @@
   .checkout-button {
     padding: 14px 24px;
   }
+}
+
+/* ── Checkout clarity: required note, help text, payment recap, success details ── */
+.required-note {
+  margin: 0 0 4px;
+  font-size: 0.8rem;
+  color: #a9a9a9;
+}
+
+.field-help {
+  margin-top: -8px;
+  padding-left: 20px;
+  font-size: 0.78rem;
+  color: #9a9a9a;
+}
+
+.pay-recap {
+  margin-top: 6px;
+  padding: 14px 16px;
+  border: 1px solid rgba(212, 175, 55, 0.35);
+  border-radius: 14px;
+  background: rgba(212, 175, 55, 0.06);
+}
+
+.pay-recap-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  font-size: 0.95rem;
+  color: #e8e8e8;
+  padding: 3px 0;
+}
+
+.pay-recap-total {
+  margin-top: 4px;
+  padding-top: 8px;
+  border-top: 1px solid rgba(212, 175, 55, 0.25);
+  font-weight: 700;
+}
+
+.pay-recap-total strong {
+  white-space: nowrap;
+  color: #FFD700;
+  font-size: 1.2rem;
+}
+
+.pay-recap-note {
+  margin: 8px 0 0;
+  font-size: 0.82rem;
+  color: #cfcfcf;
+}
+
+
+.checkout-button {
+  min-height: 52px;
+  font-size: 1.02rem;
+}
+
+.success-overlay .success-ref {
+  font-size: 1.05rem;
+  margin: 6px 0;
+}
+
+.success-overlay .success-ref strong,
+.success-overlay .success-total strong {
+  color: #FFD700;
+}
+
+.success-overlay .success-home-button {
+  margin-top: 14px;
+  width: auto;
+  padding-left: 28px;
+  padding-right: 28px;
+}
+
+/* ── Delivery address (full street address under the city) ── */
+.checkout-field-label {
+  margin: 0 0 -12px;
+  padding-inline-start: 20px;
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: #d4af37;
+}
+
+.checkout-textarea {
+  min-height: 92px;
+  border-radius: 18px;
+  resize: vertical;
+  line-height: 1.5;
+  /* 16px+ keeps iOS from zooming into the field */
+  font-size: max(1rem, 16px);
+}
+
+.checkout-textarea:focus {
+  transform: none;
+}
+
+[dir="rtl"] .checkout-textarea {
+  text-align: right;
+}
+
+[dir="rtl"] .error-hint,
+[dir="rtl"] .field-help {
+  padding-left: 0;
+  padding-right: 20px;
+}
+
+/* ── Price transparency: quantity, unit price, line subtotal, delivery fee, amount to pay ── */
+.money {
+  white-space: nowrap;
+}
+
+.summary-count {
+  margin: -8px 0 14px;
+  text-align: center;
+  font-size: 0.9rem;
+  color: #cfcfcf;
+}
+
+.summary-item {
+  align-items: flex-start;
+}
+
+.summary-media {
+  position: relative;
+  flex: none;
+}
+
+.summary-qty-badge {
+  position: absolute;
+  top: -8px;
+  inset-inline-end: -8px;
+  min-width: 30px;
+  height: 30px;
+  padding: 0 7px;
+  border-radius: 999px;
+  display: grid;
+  place-items: center;
+  background: #FFD700;
+  color: #0a0a0a;
+  font-weight: 800;
+  font-size: 0.85rem;
+  box-shadow: 0 0 0 3px #151515;
+}
+
+.summary-details {
+  flex: 1;
+  min-width: 0;
+}
+
+.summary-details h4 {
+  font-size: 1.05rem;
+  line-height: 1.35;
+}
+
+.summary-qty-x {
+  color: #FFD700;
+  font-weight: 800;
+}
+
+.line-figures {
+  margin: 10px 0 0;
+  display: grid;
+  gap: 4px;
+}
+
+.lf-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 12px;
+  font-size: 0.9rem;
+  color: #cfcfcf;
+}
+
+.lf-row dt {
+  margin: 0;
+}
+
+.lf-row dd {
+  margin: 0;
+  text-align: end;
+  color: #f0f0f0;
+}
+
+.lf-qty dd {
+  padding: 2px 10px;
+  border-radius: 999px;
+  border: 1px solid rgba(255, 215, 0, 0.55);
+  background: rgba(255, 215, 0, 0.12);
+  color: #FFD700;
+  font-weight: 800;
+  font-size: 0.95rem;
+}
+
+.lf-per {
+  color: #a9a9a9;
+  font-size: 0.82rem;
+}
+
+.lf-saving dd {
+  color: #6fdc9b;
+  font-weight: 600;
+}
+
+.lf-subtotal {
+  margin-top: 4px;
+  padding-top: 6px;
+  border-top: 1px dashed rgba(255, 255, 255, 0.14);
+}
+
+.lf-subtotal dt {
+  color: #f0f0f0;
+  font-weight: 600;
+}
+
+.lf-formula {
+  color: #9d9d9d;
+  font-size: 0.82rem;
+}
+
+.lf-subtotal strong {
+  color: #f5f5f5;
+  font-size: 1rem;
+}
+
+/* Products subtotal + delivery = YOU PAY */
+.price-breakdown {
+  margin-top: 6px;
+  padding: 16px 18px;
+  border-radius: 16px;
+  border: 1px solid rgba(212, 175, 55, 0.35);
+  background: rgba(0, 0, 0, 0.35);
+}
+
+.pb-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 12px;
+  padding: 6px 0;
+  font-size: 0.98rem;
+  color: #e8e8e8;
+}
+
+.pb-row strong {
+  white-space: nowrap;
+  font-weight: 700;
+}
+
+.pb-row-sub {
+  color: #a9a9a9;
+  font-size: 0.85rem;
+}
+
+.pb-row-delivery strong {
+  color: #8fc3ff;
+}
+
+.pb-row-total {
+  margin-top: 8px;
+  padding: 14px 16px;
+  border-radius: 12px;
+  background: linear-gradient(135deg, rgba(212, 175, 55, 0.22), rgba(255, 215, 0, 0.08));
+  border: 2px solid #FFD700;
+  align-items: center;
+}
+
+.pb-row-total > span {
+  font-family: 'Montserrat', sans-serif;
+  font-weight: 800;
+  font-size: 1.05rem;
+  letter-spacing: 1px;
+  color: #FFD700;
+}
+
+[dir="rtl"] .pb-row-total > span {
+  letter-spacing: 0;
+}
+
+.pb-row-total strong {
+  font-family: 'Montserrat', sans-serif;
+  font-size: clamp(1.6rem, 4.5vw, 2.1rem);
+  font-weight: 800;
+  color: #FFD700;
+  line-height: 1.1;
+}
+
+.pb-note {
+  margin: 10px 0 0;
+  font-size: 0.82rem;
+  color: #bdbdbd;
+  line-height: 1.5;
+}
+
+/* Recap right above the order button */
+.pay-recap-check {
+  margin: 0 0 10px;
+  font-size: 0.88rem;
+  font-weight: 600;
+  color: #FFD700;
+}
+
+.pay-recap-lines {
+  list-style: none;
+  margin: 0 0 6px;
+  padding: 0;
+  display: grid;
+  gap: 6px;
+}
+
+.pay-recap-lines li {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  font-size: 0.92rem;
+  color: #e8e8e8;
+}
+
+.pay-recap-qty {
+  flex: none;
+  min-width: 2.6em;
+  padding: 1px 8px;
+  border-radius: 999px;
+  background: #FFD700;
+  color: #0a0a0a;
+  font-weight: 800;
+  text-align: center;
+}
+
+.pay-recap-name {
+  flex: 1;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.pay-recap-lines strong {
+  white-space: nowrap;
+}
+
+.price-breakdown-compact {
+  padding: 10px 0 0;
+  border: none;
+  border-top: 1px solid rgba(212, 175, 55, 0.25);
+  border-radius: 0;
+  background: none;
+}
+
+.success-overlay .success-breakdown {
+  font-size: 0.92rem;
+  color: #cfcfcf;
+}
+
+@media (max-width: 768px) {
+  .summary-item {
+    flex-direction: row;
+    gap: 14px;
+  }
+}
+
+/* Single column (tablet / phone): show every order line, never hide one in a scroll box */
+@media (max-width: 1024px) {
+  .summary-items {
+    max-height: none;
+    overflow: visible;
+  }
+}
+
+/* Fixed image box: a slow or missing picture never squeezes the price column */
+.summary-media {
+  width: 60px;
+  height: 60px;
+}
+
+.summary-media .summary-image {
+  display: block;
+  width: 60px;
+  height: 60px;
+  overflow: hidden;
+  color: transparent;
+  font-size: 0;
 }

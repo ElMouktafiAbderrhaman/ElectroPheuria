@@ -46,8 +46,14 @@
                                 </tr>
                                 <tr>
                                     <td style="color:#aaa;font-size:13px;padding:10px 15px;border-top:1px solid #333;">City</td>
-                                    <td style="color:#f5f5f5;font-size:14px;font-weight:bold;padding:10px 15px;border-top:1px solid #333;">{{ $clientData['address'] ?? 'N/A' }}</td>
+                                    <td style="color:#f5f5f5;font-size:14px;font-weight:bold;padding:10px 15px;border-top:1px solid #333;">{{ $clientData['city'] ?? $clientData['address'] ?? 'N/A' }}</td>
                                 </tr>
+                                @if(!empty($clientData['delivery_address']))
+                                <tr>
+                                    <td style="color:#aaa;font-size:13px;padding:10px 15px;border-top:1px solid #333;vertical-align:top;">Address</td>
+                                    <td style="color:#f5f5f5;font-size:14px;font-weight:bold;padding:10px 15px;border-top:1px solid #333;white-space:pre-line;">{{ $clientData['delivery_address'] }}</td>
+                                </tr>
+                                @endif
                                 @if(!empty($clientData['email']))
                                 <tr>
                                     <td style="color:#aaa;font-size:13px;padding:10px 15px;border-top:1px solid #333;">Email</td>
@@ -70,9 +76,31 @@
                                 </tr>
                                 @foreach($products as $item)
                                 <tr>
-                                    <td style="color:#f5f5f5;font-size:14px;padding:12px 15px;border-top:1px solid #333;">{{ $item['name'] ?? 'Unknown' }}</td>
+                                    <td style="color:#f5f5f5;font-size:14px;padding:12px 15px;border-top:1px solid #333;">
+                                        {{ $item['name'] ?? 'Unknown' }}
+                                        @if (in_array($item['offer_type'] ?? null, ['bogo_half', 'bogo_fixed'], true))
+                                            <br><span style="color:#D4AF37;font-size:12px;">
+                                                @if (($item['offer_type'] ?? null) === 'bogo_fixed')
+                                                    Buy 1, Get the 2nd for {{ number_format($item['second_item_price'] ?? 0, 2) }} MAD
+                                                @else
+                                                    Buy 1, Get the 2nd at 50% Off
+                                                @endif
+                                                @if (($item['offer_discount'] ?? 0) > 0)
+                                                    (−{{ number_format($item['offer_discount'], 2) }} MAD)
+                                                @endif
+                                            </span>
+                                        @endif
+                                        @if (!empty($item['variant_label']))
+                                            <br><span style="color:#D4AF37;font-size:12px;">Cable: {{ $item['variant_label'] }}</span>
+                                        @endif
+                                        @if (!empty($item['bundle_items']))
+                                            <br><span style="color:#D4AF37;font-size:12px;">Pack:
+                                                {{ collect($item['bundle_items'])->map(fn ($bi) => ($bi['name'] ?? '') . (!empty($bi['variant_label']) ? ' (Cable: ' . $bi['variant_label'] . ')' : '') . ' ×' . (($bi['quantity'] ?? 1) * ($item['quantity'] ?? 1)))->implode(' + ') }}
+                                            </span>
+                                        @endif
+                                    </td>
                                     <td style="color:#ccc;font-size:14px;padding:12px 15px;text-align:center;border-top:1px solid #333;">x{{ $item['quantity'] ?? 1 }}</td>
-                                    <td style="color:#D4AF37;font-size:14px;font-weight:bold;padding:12px 15px;text-align:right;border-top:1px solid #333;">{{ number_format(($item['price'] ?? 0) * ($item['quantity'] ?? 1), 2) }} MAD</td>
+                                    <td style="color:#D4AF37;font-size:14px;font-weight:bold;padding:12px 15px;text-align:right;border-top:1px solid #333;">{{ number_format($item['line_total'] ?? (($item['price'] ?? 0) * ($item['quantity'] ?? 1)), 2) }} MAD</td>
                                 </tr>
                                 @endforeach
                             </table>
@@ -87,8 +115,16 @@
                                     <td style="padding:20px 25px;">
                                         <table width="100%" cellpadding="0" cellspacing="0">
                                             <tr>
-                                                <td style="color:#D4AF37;font-size:18px;font-weight:bold;">TOTAL</td>
-                                                <td style="color:#FFD700;font-size:24px;font-weight:bold;text-align:right;">MAD {{ number_format($order->total_price, 2) }}</td>
+                                                <td style="color:#ccc;font-size:14px;padding-bottom:6px;">Products subtotal</td>
+                                                <td style="color:#f5f5f5;font-size:14px;text-align:right;padding-bottom:6px;">MAD {{ number_format($order->productsSubtotal(), 2) }}</td>
+                                            </tr>
+                                            <tr>
+                                                <td style="color:#ccc;font-size:14px;padding-bottom:10px;">Delivery fee</td>
+                                                <td style="color:#f5f5f5;font-size:14px;text-align:right;padding-bottom:10px;">MAD {{ number_format((float) $order->delivery_fee, 2) }}</td>
+                                            </tr>
+                                            <tr>
+                                                <td style="color:#D4AF37;font-size:18px;font-weight:bold;border-top:1px solid #5A4A1C;padding-top:10px;">TOTAL TO COLLECT</td>
+                                                <td style="color:#FFD700;font-size:24px;font-weight:bold;text-align:right;border-top:1px solid #5A4A1C;padding-top:10px;">MAD {{ number_format($order->total_price, 2) }}</td>
                                             </tr>
                                         </table>
                                     </td>

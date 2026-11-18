@@ -1,6 +1,11 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useRef, useCallback } from "react";
 import { useParams, useNavigate, useOutletContext } from "react-router-dom";
 import api from "../../services/api.js";
+import { calcDiscountPercent, validateDealPrices, isBogoDeal, isBogoFixedDeal, validateSecondItemPrice, OFFER_STANDARD, OFFER_BOGO_HALF, OFFER_BOGO_FIXED } from "../../utils/dealPricing";
+import CableVariantsEditor, { emptyVariantsState, variantsStateFromProduct, variantsPayload, validateVariants } from "../components/CableVariantsEditor";
+import BundleEditor, { validateBundle, bundleChoices, bundleItemsPayload, bundleRefsFromDeal } from "../components/BundleEditor";
+import { VARIANT_CATEGORIES } from "../../utils/variants";
+import "./AddProducts.css";
 import "./EditProductDetail.css";
 
 /* ================= IMAGE COMPRESSION ================= */
@@ -24,7 +29,7 @@ const compressImage = (file, maxWidth = 800, quality = 0.75) => {
         const ctx = canvas.getContext("2d");
         ctx.clearRect(0, 0, width, height);
         ctx.drawImage(img, 0, 0, width, height);
-        resolve(canvas.toDataURL("image/png"));
+        resolve(canvas.toDataURL("image/jpeg", quality));
       };
       img.onerror = (error) => reject(error);
     };
@@ -36,48 +41,81 @@ export default function EditProductDetail() {
   const { id } = useParams();
   const navigate = useNavigate();
   const context = useOutletContext() || {};
+  const productsList = context.productsList || [];
+  const dealsList = context.dealsList || [];
   const setProductsList = context.setProductsList || (() => {});
   const setDealsList = context.setDealsList || (() => {});
 
+  const itemFoundRef = useRef(false);
   const [item, setItem] = useState(null);
   const [isDeal, setIsDeal] = useState(false);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
-  const [computedPrice, setComputedPrice] = useState(0);
+  const [variantsState, setVariantsState] = useState(emptyVariantsState);
+  const [bundleIds, setBundleIds] = useState(["", ""]);
 
   useEffect(() => {
+    if (itemFoundRef.current) return;
+
     const dealType = id.startsWith('deal-');
     const realId = dealType ? id.slice(5) : id;
     setIsDeal(dealType);
 
-    const key = dealType ? "ElectroPheuria_deals" : "ElectroPheuria_products";
-    try {
-      const items = JSON.parse(localStorage.getItem(key) || "[]");
-      const found = items.find(p => String(p.id) === realId);
-      if (found) {
-        setItem({ ...found });
-        if (dealType && found.oldPrice && found.discount) {
-          const newPrice = Math.round(found.oldPrice * (1 - found.discount / 100));
-          setComputedPrice(newPrice);
-        }
-      } else {
-        navigate("/dashboard/edit-products", { replace: true });
-      }
-    } catch (e) {
-      console.error('Load error:', e);
-      navigate("/dashboard/edit-products", { replace: true });
-    }
-    setLoading(false);
-  }, [id, navigate]);
+    const contextList = dealType ? dealsList : productsList;
 
-  useEffect(() => {
-    if (isDeal && item && item.oldPrice && item.discount) {
-      const newPrice = Math.round(item.oldPrice * (1 - item.discount / 100));
-      setComputedPrice(newPrice);
-      setItem(prev => ({ ...prev, price: newPrice }));
+    // Try context (App-level state) first — works even when localStorage is full
+    let found = contextList.find(p => String(p.id) === realId || String(p.dbId) === realId);
+
+    if (!found) {
+      // Fallback to localStorage
+      const key = dealType ? "ElectroPheuria_deals" : "ElectroPheuria_products";
+      try {
+        const items = JSON.parse(localStorage.getItem(key) || "[]");
+        found = items.find(p => String(p.id) === realId);
+      } catch (e) {
+        console.error('localStorage read error:', e);
+      }
     }
-  }, [isDeal, item?.oldPrice, item?.discount]);
+
+    if (found) {
+      itemFoundRef.current = true;
+      const loaded = { ...found };
+      if (dealType && loaded.deal_type === 'bundle') {
+        setBundleIds(bundleRefsFromDeal(loaded));
+        // Images shown from the two products are not the pack's own images: don't save them back.
+        if (loaded.images_from_products) loaded.images = [];
+      }
+      if (!dealType) setVariantsState(variantsStateFromProduct(loaded));
+      setItem(loaded);
+      setLoading(false);
+    } else if (contextList.length > 0) {
+      // List is loaded but item not found — redirect
+      navigate("/dashboard/edit-products", { replace: true });
+      setLoading(false);
+    }
+    // If contextList is still empty, wait for next render when data loads
+  }, [id, navigate, productsList, dealsList]);
+
+  // Deals: the promotional price is entered manually; the discount follows from it.
+  const isBundle = isDeal && item?.deal_type === 'bundle';
+  const isBogo = isDeal && !isBundle && isBogoDeal(item);
+  const isBogoFixed = isDeal && !isBundle && isBogoFixedDeal(item);
+  const dealDiscount = isDeal && !isBogo ? calcDiscountPercent(item?.oldPrice, item?.price) : null;
+  const showVariants = !isDeal && !!item && (VARIANT_CATEGORIES.includes(item.category) || !!item.has_variants || (item.variants || []).length > 0);
+  // Products and other single deals that can go into this pack.
+  const packChoices = isBundle ? bundleChoices(productsList, dealsList, item?.dbId || item?.id) : [];
+  // Bundles that contain this product / deal (they become unavailable if it is deleted).
+  const itemKind = isDeal ? 'deal' : 'product';
+  const bundlesWithItem = item && !isBundle
+    ? dealsList.filter((d) => d.deal_type === 'bundle' && (d.bundle_products || []).some((p) => (p.kind || 'product') === itemKind && String(p.id) === String(item.dbId || item.id)))
+    : [];
+  const bogoPriceError = (it) => (Number(it?.price) > 0
+    ? (isBogoFixedDeal(it) ? validateSecondItemPrice(it.price, it.second_item_price ?? "") : "")
+    : "Unit price must be a positive number.");
+  const dealPriceError = isDeal && item
+    ? (isBundle ? "" : isBogo ? bogoPriceError(item) : validateDealPrices(item.oldPrice, item.price))
+    : "";
 
   const handleFieldChange = useCallback((e) => {
     const { name, value } = e.target;
@@ -205,43 +243,101 @@ export default function EditProductDetail() {
 
   const handleSave = useCallback(async () => {
     if (!item) return;
-    setSaving(true);
     const dealType = id.startsWith('deal-');
+    const bundle = dealType && item.deal_type === 'bundle';
+    const bogo = dealType && !bundle && isBogoDeal(item);
+    if (dealType) {
+      const priceError = bundle
+        ? validateBundle(packChoices, bundleIds, item.price)
+        : bogo
+        ? bogoPriceError(item)
+        : validateDealPrices(item.oldPrice, item.price);
+      if (priceError) {
+        alert(priceError);
+        return;
+      }
+    } else if (showVariants) {
+      const variantsError = validateVariants(variantsState);
+      if (variantsError) {
+        alert(variantsError);
+        return;
+      }
+    }
+    setSaving(true);
     const realId = dealType ? id.slice(5) : id;
     const key = dealType ? "ElectroPheuria_deals" : "ElectroPheuria_products";
     try {
       // Update in database using the DB id
       const dbId = item.dbId || item.id;
       if (dealType) {
-        await api.updateDeal({ ...item, id: dbId });
+        // A 1+1 deal has no promotional price, so the two offers never stack.
+        const payload = bundle
+          ? {
+              ...item,
+              deal_type: 'bundle',
+              bundle_items: bundleItemsPayload(bundleIds),
+              offer_type: OFFER_STANDARD,
+              second_item_price: null,
+              images: (item.images || []).filter(Boolean),
+            }
+          : bogo
+          ? { ...item, deal_type: 'single', oldPrice: item.price, discount: 0, second_item_price: isBogoFixedDeal(item) ? Number(item.second_item_price) : null }
+          : { ...item, deal_type: 'single', offer_type: OFFER_STANDARD, discount: calcDiscountPercent(item.oldPrice, item.price), second_item_price: null };
+        delete payload.bundle_products;
+        delete payload.images_from_products;
+        await api.updateDeal({ ...payload, id: dbId });
       } else {
-        await api.updateProduct({ ...item, id: dbId });
+        const { variants: _ignored, ...rest } = item;
+        // Only send variants when the section is shown, so other products are never touched.
+        await api.updateProduct({ ...rest, id: dbId, ...(showVariants ? variantsPayload(variantsState) : {}) });
       }
 
-      // Also update localStorage
-      const items = JSON.parse(localStorage.getItem(key) || "[]");
-      const updatedItems = items.map(i => String(i.id) === realId ? item : i);
-      localStorage.setItem(key, JSON.stringify(updatedItems));
-      
+      // Bundles and variants are rebuilt by the server (combined price, images, labels): reload them.
+      if (bundle || (!dealType && showVariants)) {
+        try {
+          const fresh = dealType ? await api.getDeals() : await api.getProducts();
+          (dealType ? setDealsList : setProductsList)(fresh);
+          try { localStorage.setItem(key, JSON.stringify(fresh)); } catch { /* full */ }
+          window.dispatchEvent(new Event(dealType ? 'dealsUpdated' : 'productsUpdated'));
+          navigate("/dashboard/edit-products");
+          setSaving(false);
+          return;
+        } catch (reloadErr) {
+          console.warn('Reload after save failed:', reloadErr);
+        }
+      }
+
+      // Update context state (source of truth)
+      const replaceFn = (i) => (String(i.id) === realId || String(i.dbId) === realId) ? item : i;
       if (dealType) {
-        setDealsList(updatedItems);
+        setDealsList(prev => prev.map(replaceFn));
       } else {
-        setProductsList(updatedItems);
+        setProductsList(prev => prev.map(replaceFn));
+      }
+
+      // Also update localStorage (best-effort)
+      try {
+        const items = JSON.parse(localStorage.getItem(key) || "[]");
+        const updatedItems = items.map(i => String(i.id) === realId ? item : i);
+        localStorage.setItem(key, JSON.stringify(updatedItems));
+      } catch (storageErr) {
+        console.warn('localStorage full, save not cached locally');
       }
       navigate("/dashboard/edit-products");
     } catch (e) {
       console.error('Save error:', e);
-      alert('Failed to save changes. Please try again.');
+      alert(`Failed to save changes: ${e?.message || 'Please try again.'}`);
     }
     setSaving(false);
-  }, [item, id, navigate, setProductsList, setDealsList, isDeal]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [item, id, navigate, setProductsList, setDealsList, isDeal, bundleIds, variantsState, showVariants, packChoices]);
 
   const handleDelete = useCallback(async () => {
     if (!item) return;
     const dealType = id.startsWith('deal-');
     const realId = dealType ? id.slice(5) : id;
     const key = dealType ? "ElectroPheuria_deals" : "ElectroPheuria_products";
-    
+
     try {
       // Delete from database
       const dbId = item.dbId || item.id;
@@ -255,15 +351,21 @@ export default function EditProductDetail() {
         console.warn('API delete failed (continuing with local):', apiErr);
       }
 
-      // Delete from localStorage (compare as strings to avoid type mismatch)
-      const items = JSON.parse(localStorage.getItem(key) || "[]");
-      const updated = items.filter(i => String(i.id) !== String(realId));
-      localStorage.setItem(key, JSON.stringify(updated));
-      
+      // Update context state (source of truth)
+      const filterFn = (i) => String(i.id) !== String(realId) && String(i.dbId) !== String(realId);
       if (dealType) {
-        setDealsList(updated);
+        setDealsList(prev => prev.filter(filterFn));
       } else {
-        setProductsList(updated);
+        setProductsList(prev => prev.filter(filterFn));
+      }
+
+      // Delete from localStorage (best-effort)
+      try {
+        const items = JSON.parse(localStorage.getItem(key) || "[]");
+        const updated = items.filter(i => String(i.id) !== String(realId));
+        localStorage.setItem(key, JSON.stringify(updated));
+      } catch (storageErr) {
+        console.warn('localStorage full, delete not cached locally');
       }
       window.dispatchEvent(new Event(dealType ? 'dealsUpdated' : 'productsUpdated'));
       navigate("/dashboard/edit-products");
@@ -286,21 +388,21 @@ export default function EditProductDetail() {
         <button className="back-button" onClick={() => navigate("/dashboard/edit-products")}>
           ← Back
         </button>
-        <h1>Edit {isDeal ? 'Deal' : 'Product'}: {item.name}</h1>
+        <h1>Edit {isBundle ? 'Bundle Deal' : isDeal ? 'Deal' : 'Product'}: {item.name}</h1>
       </div>
 
       <div className="edit-detail-card">
         <div className="detail-image-section">
-          <label>Images (click to change) — minimum 3, add more below</label>
+          <label>{isBundle ? 'Pack images (optional — leave empty to show the two product images)' : 'Images (click to change) — minimum 3, add more below'}</label>
           <div className="images-preview">
             {displayImages.map((img, i) => (
               <div key={i} className="image-preview">
                 <img src={img || '/vite.svg'} alt={`Image ${i+1}`} className="preview-img" />
-                <input 
-                  type="file" 
-                  accept="image/*" 
-                  onChange={handleImageChange(i)} 
-                  className="form-file" 
+                <input
+                  type="file"
+                  accept="image/*"
+                  onChange={handleImageChange(i)}
+                  className="form-file"
                 />
                 <label className="file-label">Image {i+1}</label>
                 {displayImages.length > 3 && (
@@ -313,21 +415,74 @@ export default function EditProductDetail() {
         </div>
 
         <div className="detail-form">
+          {isDeal && !isBundle && (
+            <div className="input-group">
+              <label>Offer Type</label>
+              <select
+                value={isBogoFixed ? OFFER_BOGO_FIXED : isBogo ? OFFER_BOGO_HALF : OFFER_STANDARD}
+                onChange={(e) => setItem(prev => ({ ...prev, offer_type: e.target.value }))}
+                className="form-input"
+              >
+                <option value={OFFER_STANDARD}>Standard Discount (promotional price)</option>
+                <option value={OFFER_BOGO_HALF}>Buy 1, Get the 2nd at 50% Off</option>
+                <option value={OFFER_BOGO_FIXED}>Buy 1, Get the 2nd for a Fixed Price</option>
+              </select>
+              {isBogoFixed && (
+                <>
+                  <label style={{ marginTop: 12 }}>Price of the 2nd Item (MAD)</label>
+                  <input
+                    type="number"
+                    name="second_item_price"
+                    value={item.second_item_price ?? ''}
+                    onChange={handleFieldChange}
+                    className="form-input"
+                    placeholder="e.g. 50"
+                    min="0"
+                    step="0.01"
+                  />
+                  <p style={{ fontSize: '0.8125rem', margin: '8px 0 0', opacity: 0.85 }}>
+                    Every second unit of this item costs exactly this price (e.g. 199 MAD with 2nd at 50: 1 = 199, 2 = 249, 3 = 448, 4 = 498).
+                    No rounding and no promotional price is applied on top.
+                  </p>
+                </>
+              )}
+              {isBogo && !isBogoFixed && (
+                <p style={{ fontSize: '0.8125rem', margin: '8px 0 0', opacity: 0.85 }}>
+                  Every second unit of this item is half price, and the total is rounded down to a price ending in 9 (e.g. 199 MAD: 1 = 199, 2 = 289, 3 = 489, 4 = 589).
+                  No promotional price is applied on top.
+                </p>
+              )}
+            </div>
+          )}
+
           <div className="input-group">
             <label>Name</label>
             <input type="text" name="name" value={item.name || ''} onChange={handleFieldChange} className="form-input" />
           </div>
 
+          {isBundle && (
+            <div className="input-group">
+              <label>🎁 Two-Item Bundle</label>
+              <BundleEditor
+                choices={packChoices}
+                productIds={bundleIds}
+                onProductsChange={setBundleIds}
+                price={item.price ?? ''}
+                onPriceChange={(v) => setItem(prev => ({ ...prev, price: v }))}
+              />
+            </div>
+          )}
+
+          {!isBundle && (
           <div className="input-row">
             <div className="input-group">
-              <label>Price (MAD)</label>
-              <input 
-                type="number" 
-                name="price" 
-                value={isDeal ? computedPrice : (item.price || 0)} 
+              <label>{isBogo ? "Unit Price (MAD)" : isDeal ? "Promotional Price (MAD)" : "Price (MAD)"}</label>
+              <input
+                type="number"
+                name="price"
+                value={item.price ?? ''}
                 onChange={handleFieldChange}
-                readOnly={isDeal}
-                className="form-input" 
+                className="form-input"
                 min="0"
                 step="0.01"
                 onFocus={clearZero}
@@ -335,47 +490,89 @@ export default function EditProductDetail() {
             </div>
             <div className="input-group">
               <label>Stock</label>
-              <input 
-                type="number" 
-                name="stock" 
-                value={item.stock || 0} 
-                onChange={handleFieldChange} 
-                className="form-input" 
+              <input
+                type="number"
+                name="stock"
+                value={item.stock || 0}
+                onChange={handleFieldChange}
+                className="form-input"
                 min="0"
                 onFocus={clearZero}
               />
             </div>
           </div>
+          )}
 
-          {isDeal && (
+          {showVariants && (
+            <CableVariantsEditor
+              value={variantsState}
+              onChange={setVariantsState}
+              productPrice={item.price}
+              productStock={item.stock}
+            />
+          )}
+
+          {isDeal && !isBogo && !isBundle && (
             <div className="input-row">
               <div className="input-group">
-                <label>Old Price (MAD)</label>
-                <input 
-                  type="number" 
-                  name="oldPrice" 
-                  value={item.oldPrice || 0} 
-                  onChange={handleFieldChange} 
-                  className="form-input" 
-                  min="0"
+                <label>Original Price (MAD)</label>
+                <input
+                  type="number"
+                  name="oldPrice"
+                  value={item.oldPrice ?? ''}
+                  onChange={handleFieldChange}
+                  className="form-input"
+                  min="0.01"
+                  step="0.01"
                   onFocus={clearZero}
                 />
               </div>
               <div className="input-group">
-                <label>Discount (%)</label>
-                <input 
-                  type="number" 
-                  name="discount" 
-                  value={item.discount || 0} 
-                  onChange={handleFieldChange} 
-                  className="form-input" 
-                  min="0"
-                  max="100"
-                  onFocus={clearZero}
+                <label>Discount (auto-calculated)</label>
+                <input
+                  type="text"
+                  value={dealDiscount !== null ? `-${dealDiscount}%` : "—"}
+                  className="form-input"
+                  readOnly
+                  tabIndex={-1}
                 />
               </div>
             </div>
           )}
+
+          {isDeal && dealPriceError && (
+            <p style={{ color: '#f87171', fontSize: '0.8125rem', margin: '-8px 0 16px' }}>{dealPriceError}</p>
+          )}
+
+          <div className="input-group">
+            <label>Status</label>
+            <label style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer', color: 'inherit' }}>
+              <input
+                type="checkbox"
+                checked={item.active !== false}
+                onChange={(e) => setItem(prev => ({ ...prev, active: e.target.checked }))}
+                style={{ width: 16, height: 16, accentColor: '#D4AF37' }}
+              />
+              <span>{item.active !== false ? "Active — visible in store" : isDeal ? "Inactive — hidden from store" : "Hidden — not shown in store (packs that include it still work)"}</span>
+            </label>
+          </div>
+
+          <div className="input-group">
+            <label>Coming soon</label>
+            <label style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer', color: 'inherit' }}>
+              <input
+                type="checkbox"
+                checked={item.coming_soon === true || item.coming_soon === 1}
+                onChange={(e) => setItem(prev => ({ ...prev, coming_soon: e.target.checked }))}
+                style={{ width: 16, height: 16, accentColor: '#D4AF37' }}
+              />
+              <span>
+                {item.coming_soon === true || item.coming_soon === 1
+                  ? "⏳ Set as coming soon — shown in store with a \"Coming soon\" design, cannot be ordered"
+                  : "Set as coming soon product"}
+              </span>
+            </label>
+          </div>
 
           <div className="input-group">
             <label>Description</label>
@@ -567,6 +764,13 @@ export default function EditProductDetail() {
           <div className="confirm-content">
             <h3>Confirm Delete</h3>
             <p>Delete "{item.name}"? Cannot be undone.</p>
+            {isBundle && <p>Only the bundle is deleted — its two items stay in your catalogue.</p>}
+            {bundlesWithItem.length > 0 && (
+              <p style={{ color: '#f87171' }}>
+                This {isDeal ? "deal" : "product"} is part of {bundlesWithItem.length === 1 ? 'the bundle' : 'the bundles'} {bundlesWithItem.map((d) => `"${d.name}"`).join(', ')},
+                which will no longer be orderable.
+              </p>
+            )}
             <div className="confirm-buttons">
               <button className="confirm-yes" onClick={handleDelete}>Yes</button>
               <button className="confirm-no" onClick={() => setShowDeleteConfirm(false)}>Cancel</button>

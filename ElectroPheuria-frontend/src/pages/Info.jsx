@@ -32,6 +32,10 @@ export default function Info() {
             <p>{t("faq1A")}</p>
           </div>
           <div className="info-card">
+            <h4>{t("faq5Q")}</h4>
+            <p>{t("faq5A")}</p>
+          </div>
+          <div className="info-card">
             <h4>{t("faq2Q")}</h4>
             <p>{t("faq2A")}</p>
           </div>

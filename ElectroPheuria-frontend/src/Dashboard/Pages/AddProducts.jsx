@@ -1,8 +1,13 @@
 // src/Dashboard/Pages/AddProducts.jsx
 import { useState } from "react";
-import { useOutletContext } from "react-router-dom";
+import { useNavigate, useOutletContext } from "react-router-dom";
 import api from "../../services/api";
+import { calcDiscountPercent, validateDealPrices, lineTotal, formatPrice, OFFER_STANDARD, OFFER_BOGO_HALF, OFFER_BOGO_FIXED, validateSecondItemPrice } from "../../utils/dealPricing";
+import CableVariantsEditor, { emptyVariantsState, variantsPayload, validateVariants } from "../components/CableVariantsEditor";
+import BundleEditor, { validateBundle, bundleCombinedPrice, bundleChoices, bundleItemsPayload } from "../components/BundleEditor";
+import { VARIANT_CATEGORIES } from "../../utils/variants";
 import "./AddProducts.css";
+import "./Banners.css";
 
 /* ================= SAFE ID GENERATOR ================= */
 const generateId = () => {
@@ -40,7 +45,7 @@ const compressImage = (file, maxWidth = 600, quality = 0.7) => {
         ctx.clearRect(0, 0, width, height);
         ctx.drawImage(img, 0, 0, width, height);
 
-        const compressedDataUrl = canvas.toDataURL("image/png");
+        const compressedDataUrl = canvas.toDataURL("image/jpeg", quality);
         resolve(compressedDataUrl);
       };
       img.onerror = (error) => reject(error);
@@ -53,6 +58,8 @@ export default function AddProduct() {
   const context = useOutletContext() || {};
   const setProductsList = context.setProductsList || (() => {});
   const setDealsList = context.setDealsList || (() => {});
+  const productsList = context.productsList || [];
+  const dealsList = context.dealsList || [];
 
   const categories = [
     { value: "batteries", label: "Power Banks & Chargers" },
@@ -82,11 +89,34 @@ export default function AddProduct() {
   // Gallery info images (separate from product images)
   const [galleryItems, setGalleryItems] = useState([{ image: null, text: { fr: "", en: "", ar: "" } }]);
 
+  // Cable variants (Lightning / USB Type-C) — only for the chargers category
+  const [variantsState, setVariantsState] = useState(emptyVariantsState);
+  const showVariants = VARIANT_CATEGORIES.includes(category);
+
   /* ================= DEALS ================= */
 
   const [dealName, setDealName] = useState("");
   const [dealOldPrice, setDealOldPrice] = useState("");
-  const [dealDiscount, setDealDiscount] = useState("");
+  const [dealPrice, setDealPrice] = useState("");
+  const [dealActive, setDealActive] = useState(true);
+  const [dealOfferType, setDealOfferType] = useState(OFFER_STANDARD);
+  const isBogoFixed = dealOfferType === OFFER_BOGO_FIXED;
+  const isBogo = dealOfferType === OFFER_BOGO_HALF || isBogoFixed;
+  const [dealSecondPrice, setDealSecondPrice] = useState("");
+  const [dealBaseProduct, setDealBaseProduct] = useState("");
+  // "single" = existing one-product deal, "bundle" = two different products for one price
+  const [dealType, setDealType] = useState("single");
+  const isBundle = dealType === "bundle";
+  const [bundleIds, setBundleIds] = useState(["", ""]);
+  // Products and existing single deals that can go into a pack.
+  const packChoices = bundleChoices(productsList, dealsList);
+
+  // Discount is always derived from the two prices the admin typed.
+  const dealDiscount = calcDiscountPercent(dealOldPrice, dealPrice);
+  const dealPriceError = isBogo
+    ? (dealPrice !== "" && !(parseFloat(dealPrice) > 0) ? "Unit price must be a positive number."
+      : isBogoFixed && dealSecondPrice !== "" ? validateSecondItemPrice(dealPrice, dealSecondPrice) : "")
+    : dealOldPrice !== "" && dealPrice !== "" ? validateDealPrices(dealOldPrice, dealPrice) : "";
 
   const [dealDescription, setDealDescription] = useState({ fr: "", en: "", ar: "" });
   const [dealStock, setDealStock] = useState("");
@@ -111,6 +141,12 @@ export default function AddProduct() {
 
     if (numericPrice <= 0) {
       alert("Price must be greater than 0");
+      return;
+    }
+
+    const variantsError = showVariants ? validateVariants(variantsState) : "";
+    if (variantsError) {
+      alert(variantsError);
       return;
     }
 
@@ -169,6 +205,7 @@ export default function AddProduct() {
       },
       specs: specsData,
       gallery: galleryData,
+      ...(showVariants ? variantsPayload(variantsState) : { has_variants: false, variants: [] }),
     };
 
     try {
@@ -188,9 +225,13 @@ export default function AddProduct() {
       }
 
       const productWithDbId = { ...newProduct, dbId: dbResult.id };
-      localStorage.setItem("ElectroPheuria_products", JSON.stringify([...currentProducts, productWithDbId]));
       setProductsList((prev) => [...prev, productWithDbId]);
       window.dispatchEvent(new CustomEvent('productsUpdated'));
+      try {
+        localStorage.setItem("ElectroPheuria_products", JSON.stringify([...currentProducts, productWithDbId]));
+      } catch (storageErr) {
+        console.warn('localStorage full, product not cached locally');
+      }
 
       alert('Product added successfully!');
 
@@ -204,12 +245,13 @@ export default function AddProduct() {
       setCategory(categories[0].value);
       setSpecs([{ label: "", value: "" }]);
       setGalleryItems([{ image: null, text: { fr: "", en: "", ar: "" } }]);
+      setVariantsState(emptyVariantsState());
     } catch (error) {
       if (error.name === "QuotaExceededError") {
         alert("Storage full! Please clear some products or use smaller images.");
       } else {
         console.error("Error saving product:", error);
-        alert("Error saving product. Please try again.");
+        alert(`Error saving product: ${error.message || "Please try again."}`);
       }
     }
   };
@@ -217,25 +259,34 @@ export default function AddProduct() {
   /* ================= ADD DEAL ================= */
 
   const handleAddDeal = async () => {
-    if (!dealName.trim() || !dealOldPrice || !dealDiscount) {
-      alert("Please fill deal name, original price, and discount");
+    if (isBundle) {
+      const bundleError = validateBundle(packChoices, bundleIds, dealPrice);
+      if (bundleError) {
+        alert(bundleError);
+        return;
+      }
+    } else if (!dealName.trim() || !dealPrice || (!isBogo && !dealOldPrice) || (isBogoFixed && dealSecondPrice === "")) {
+      alert(isBogoFixed
+        ? "Please fill deal name, unit price, and the price of the second item"
+        : isBogo
+        ? "Please fill deal name and unit price"
+        : "Please fill deal name, original price, and promotional price");
       return;
     }
 
-    const oldPrice = parseFloat(dealOldPrice);
-    const discountValue = parseFloat(dealDiscount);
-
-    if (oldPrice <= 0) {
-      alert("Original price must be greater than 0");
+    const priceError = isBundle ? "" : isBogo
+      ? (parseFloat(dealPrice) > 0 ? (isBogoFixed ? validateSecondItemPrice(dealPrice, dealSecondPrice) : "") : "Unit price must be a positive number.")
+      : validateDealPrices(dealOldPrice, dealPrice);
+    if (priceError) {
+      alert(priceError);
       return;
     }
 
-    if (discountValue < 0 || discountValue > 90) {
-      alert("Discount must be between 0% and 90%");
-      return;
-    }
-
-    const discountedPrice = oldPrice - (oldPrice * discountValue) / 100;
+    const promoPrice = parseFloat(parseFloat(dealPrice).toFixed(2));
+    // A 1+1 deal has no promotional price, so the two offers never stack.
+    // A bundle's original price is the two products' combined price (recomputed by the server).
+    const oldPrice = isBundle ? bundleCombinedPrice(packChoices, bundleIds) : isBogo ? promoPrice : parseFloat(parseFloat(dealOldPrice).toFixed(2));
+    const discountValue = isBogo && !isBundle ? 0 : calcDiscountPercent(oldPrice, promoPrice);
 
     // Compress images
     const images = [];
@@ -278,7 +329,12 @@ export default function AddProduct() {
       name: dealName.trim(),
       oldPrice,
       discount: discountValue,
-      price: parseFloat(discountedPrice.toFixed(2)),
+      price: promoPrice,
+      active: dealActive,
+      offer_type: isBundle ? OFFER_STANDARD : dealOfferType,
+      second_item_price: isBogoFixed && !isBundle ? parseFloat(parseFloat(dealSecondPrice).toFixed(2)) : null,
+      deal_type: dealType,
+      ...(isBundle ? { bundle_items: bundleItemsPayload(bundleIds) } : {}),
       description: {
         fr: dealDescription.fr.trim(),
         en: dealDescription.en.trim(),
@@ -297,34 +353,39 @@ export default function AddProduct() {
     };
 
     try {
-      // Save to database
-      const dbResult = await api.addDeal(newDeal);
+      const createdDeal = await api.addDeal(newDeal);
 
-      // Also save to localStorage for instant UI update
-      let currentDeals = [];
+      setDealsList((prev) => [...prev, createdDeal]);
+
       try {
         const saved = localStorage.getItem("ElectroPheuria_deals");
-        if (saved) {
-          currentDeals = JSON.parse(saved);
-        }
-      } catch (e) {
-        console.error("Error reading deals:", e);
-        currentDeals = [];
+        const currentDeals = saved ? JSON.parse(saved) : [];
+        localStorage.setItem("ElectroPheuria_deals", JSON.stringify([...currentDeals, createdDeal]));
+      } catch (storageErr) {
+        console.warn('localStorage full, deal not cached locally');
       }
 
-      const dealWithDbId = { ...newDeal, dbId: dbResult.id };
-      localStorage.setItem("ElectroPheuria_deals", JSON.stringify([...currentDeals, dealWithDbId]));
-      setDealsList((prev) => [...prev, dealWithDbId]);
-
-      // Dispatch event to notify Home page
       window.dispatchEvent(new Event('dealsUpdated'));
+      // Offer to feature the new deal on the homepage; nothing is published without confirmation.
+      setFeaturePrompt({ id: createdDeal?.id, name: dealName.trim() || newDeal.name || "Bundle" });
+      // The server builds the bundle's name / prices / images: reload the list from it.
+      if (isBundle) {
+        api.getDeals().then((deals) => {
+          setDealsList(deals);
+          try { localStorage.setItem("ElectroPheuria_deals", JSON.stringify(deals)); } catch { /* full */ }
+          window.dispatchEvent(new Event('dealsUpdated'));
+        }).catch(() => {});
+      }
+      setDealType("single");
+      setBundleIds(["", ""]);
 
-      alert('Deal added successfully!');
-
-      // Reset fields
       setDealName("");
       setDealOldPrice("");
-      setDealDiscount("");
+      setDealPrice("");
+      setDealActive(true);
+      setDealOfferType(OFFER_STANDARD);
+      setDealSecondPrice("");
+      setDealBaseProduct("");
       setDealImages([null, null, null]);
       setDealDescription({ fr: "", en: "", ar: "" });
       setDealStock("");
@@ -333,28 +394,46 @@ export default function AddProduct() {
       setDealSpecs([{ label: "", value: "" }]);
       setDealGalleryItems([{ image: null, text: { fr: "", en: "", ar: "" } }]);
     } catch (error) {
-      if (error.name === "QuotaExceededError") {
-        alert("Storage full! Please clear some deals or use smaller images.");
-      } else {
-        console.error("Error saving deal:", error);
-        alert(`Error saving deal: ${error.data?.message || error.message || 'Unknown error'}`);
-      }
+      console.error("Failed to create deal:", error);
+      alert(`Error saving deal: ${error.message || "Unknown error"}`);
     }
   };
 
   /* ================= PREVIEW CALCULATION ================= */
 
   const calculatePreview = () => {
-    if (!dealOldPrice || !dealDiscount) return null;
+    if (dealDiscount === null) return null;
+    return {
+      oldP: parseFloat(dealOldPrice),
+      discount: dealDiscount,
+      newP: parseFloat(dealPrice).toFixed(2),
+    };
+  };
 
-    const oldP = parseFloat(dealOldPrice);
-    const discount = parseFloat(dealDiscount);
-    const newP = oldP - (oldP * discount) / 100;
-
-    return { oldP, discount, newP: newP.toFixed(2) };
+  // Optional: start a deal from an existing catalog product.
+  const handleBaseProductChange = (productId) => {
+    setDealBaseProduct(productId);
+    const product = productsList.find((p) => String(p.id) === String(productId));
+    if (!product) return;
+    setDealName(product.name || "");
+    if (product.price) {
+      setDealOldPrice(String(product.price));
+      if (isBogo) setDealPrice(String(product.price));
+    }
+    const desc = product.description;
+    setDealDescription(
+      desc && typeof desc === "object"
+        ? { fr: desc.fr || "", en: desc.en || "", ar: desc.ar || "" }
+        : { fr: desc || "", en: "", ar: "" }
+    );
+    if (Array.isArray(product.specs) && product.specs.length) {
+      setDealSpecs(product.specs.map((s) => ({ label: s.label || "", value: s.value || "" })));
+    }
   };
 
   const [activeTab, setActiveTab] = useState("product");
+  const [featurePrompt, setFeaturePrompt] = useState(null);
+  const navigate = useNavigate();
 
   const preview = calculatePreview();
 
@@ -440,6 +519,15 @@ export default function AddProduct() {
                 ))}
               </select>
             </div>
+
+            {showVariants && (
+              <CableVariantsEditor
+                value={variantsState}
+                onChange={setVariantsState}
+                productPrice={price}
+                productStock={stock}
+              />
+            )}
 
             <div className="input-group">
               <label>Description</label>
@@ -700,16 +788,194 @@ export default function AddProduct() {
 
           <div className="form-container">
             <div className="input-group">
-              <label>Deal Name</label>
+              <label>Deal Type</label>
+              <div className="offer-type-switch" role="radiogroup">
+                <label className={`offer-type-option${!isBundle ? " active" : ""}`}>
+                  <input type="radio" name="dealType" checked={!isBundle} onChange={() => setDealType("single")} />
+                  <span className="offer-type-title">Single Product Deal</span>
+                  <span className="offer-type-desc">One product with a promotional price or a 1+1 offer</span>
+                </label>
+                <label className={`offer-type-option${isBundle ? " active" : ""}`}>
+                  <input type="radio" name="dealType" checked={isBundle} onChange={() => setDealType("bundle")} />
+                  <span className="offer-type-title">Two-Product Bundle Deal</span>
+                  <span className="offer-type-desc">Two products or deals in one card, one price for both</span>
+                </label>
+              </div>
+            </div>
+
+            {!isBundle && (
+            <div className="input-group">
+              <label>Offer Type</label>
+              <div className="offer-type-switch" role="radiogroup">
+                <label className={`offer-type-option${!isBogo ? " active" : ""}`}>
+                  <input
+                    type="radio"
+                    name="offerType"
+                    checked={!isBogo}
+                    onChange={() => setDealOfferType(OFFER_STANDARD)}
+                  />
+                  <span className="offer-type-title">Standard Discount</span>
+                  <span className="offer-type-desc">Promotional price with a discount percentage</span>
+                </label>
+                <label className={`offer-type-option${dealOfferType === OFFER_BOGO_HALF ? " active" : ""}`}>
+                  <input
+                    type="radio"
+                    name="offerType"
+                    checked={dealOfferType === OFFER_BOGO_HALF}
+                    onChange={() => setDealOfferType(OFFER_BOGO_HALF)}
+                  />
+                  <span className="offer-type-title">Buy 1, Get the 2nd at 50% Off</span>
+                  <span className="offer-type-desc">Every second unit of this item is half price</span>
+                </label>
+                <label className={`offer-type-option${isBogoFixed ? " active" : ""}`}>
+                  <input
+                    type="radio"
+                    name="offerType"
+                    checked={isBogoFixed}
+                    onChange={() => setDealOfferType(OFFER_BOGO_FIXED)}
+                  />
+                  <span className="offer-type-title">Buy 1, Get the 2nd for a Fixed Price</span>
+                  <span className="offer-type-desc">You enter the price of the second unit (e.g. 50 MAD)</span>
+                </label>
+              </div>
+            </div>
+            )}
+
+            {!isBundle && productsList.length > 0 && (
+              <div className="input-group">
+                <label>{isBogo ? "Product for this offer (optional pre-fill)" : "Base Product (optional)"}</label>
+                <select
+                  value={dealBaseProduct}
+                  onChange={(e) => handleBaseProductChange(e.target.value)}
+                  className="form-select deal-input"
+                >
+                  <option value="">— Start from scratch —</option>
+                  {productsList.map((p) => (
+                    <option key={p.id} value={p.id}>
+                      {p.name} ({p.price} MAD)
+                    </option>
+                  ))}
+                </select>
+              </div>
+            )}
+
+            <div className="input-group">
+              <label>{isBundle ? "Pack Name (optional)" : "Deal Name"}</label>
               <input
                 type="text"
-                placeholder="Enter deal name"
+                placeholder={isBundle ? "Leave empty for “Item 1 + Item 2”" : "Enter deal name"}
                 value={dealName}
                 onChange={(e) => setDealName(e.target.value)}
                 className="form-input deal-input"
               />
             </div>
 
+            {isBundle ? (
+              <>
+                <BundleEditor
+                  choices={packChoices}
+                  productIds={bundleIds}
+                  onProductsChange={setBundleIds}
+                  price={dealPrice}
+                  onPriceChange={setDealPrice}
+                />
+                <div className="input-group">
+                  <label>Status</label>
+                  <label className="category-checkbox deal-active-toggle">
+                    <input
+                      type="checkbox"
+                      checked={dealActive}
+                      onChange={(e) => setDealActive(e.target.checked)}
+                    />
+                    <span>{dealActive ? "Active — visible in store" : "Inactive — hidden from store"}</span>
+                  </label>
+                </div>
+              </>
+            ) : isBogo ? (
+              <>
+                <div className="input-row">
+                  <div className="input-group">
+                    <label>Unit Price (MAD)</label>
+                    <input
+                      type="number"
+                      placeholder="0.00"
+                      value={dealPrice}
+                      onChange={(e) => setDealPrice(e.target.value)}
+                      className={`form-input deal-input${dealPriceError ? " input-invalid" : ""}`}
+                      min="0.01"
+                      step="0.01"
+                    />
+                  </div>
+
+                  {isBogoFixed && (
+                    <div className="input-group">
+                      <label>Price of the 2nd Item (MAD)</label>
+                      <input
+                        type="number"
+                        placeholder="e.g. 50"
+                        value={dealSecondPrice}
+                        onChange={(e) => setDealSecondPrice(e.target.value)}
+                        className={`form-input deal-input${dealPriceError ? " input-invalid" : ""}`}
+                        min="0"
+                        step="0.01"
+                      />
+                    </div>
+                  )}
+                </div>
+
+                <div className="input-row">
+                  <div className="input-group">
+                    <label>Status</label>
+                    <label className="category-checkbox deal-active-toggle">
+                      <input
+                        type="checkbox"
+                        checked={dealActive}
+                        onChange={(e) => setDealActive(e.target.checked)}
+                      />
+                      <span>{dealActive ? "Active — visible in store" : "Inactive — hidden from store"}</span>
+                    </label>
+                  </div>
+                </div>
+
+                {dealPriceError && <p className="deal-price-error">{dealPriceError}</p>}
+
+                <div className="deal-preview">
+                  <div className="preview-content">
+                    <span className="preview-label">How this offer works</span>
+                    {isBogoFixed ? (
+                      <p className="bogo-explain">
+                        The customer pays full price for the first item and <strong>exactly {dealSecondPrice !== "" ? formatPrice(dealSecondPrice) : "X"} MAD for the second</strong>.
+                        It repeats for every pair of the same item in the cart. No rounding and no promotional price is applied on top.
+                      </p>
+                    ) : (
+                      <p className="bogo-explain">
+                        The customer pays full price for the first item and <strong>50% of the price for the second</strong>.
+                        It repeats for every pair of the same item in the cart, and the total is rounded down to a price ending in 9 (e.g. 298.50 → 289). No promotional price is applied on top.
+                      </p>
+                    )}
+                    {parseFloat(dealPrice) > 0 && (!isBogoFixed || (dealSecondPrice !== "" && !dealPriceError)) ? (
+                      <table className="bogo-preview-table">
+                        <tbody>
+                          {[1, 2, 3, 4].map((q) => {
+                            const l = lineTotal({ price: dealPrice, quantity: q, offer_type: dealOfferType, second_item_price: dealSecondPrice });
+                            return (
+                              <tr key={q}>
+                                <td>{q} item{q > 1 ? "s" : ""}</td>
+                                <td className="preview-old">{l.discount > 0 ? `${formatPrice(l.subtotal)} MAD` : ""}</td>
+                                <td className="preview-new">{formatPrice(l.total)} MAD</td>
+                              </tr>
+                            );
+                          })}
+                        </tbody>
+                      </table>
+                    ) : (
+                      <p className="preview-placeholder">{isBogoFixed ? "Enter the unit price and the 2nd item price" : "Enter the unit price"} to see the totals for 1–4 items</p>
+                    )}
+                  </div>
+                </div>
+              </>
+            ) : (
+            <>
             <div className="input-row">
               <div className="input-group">
                 <label>Original Price (MAD)</label>
@@ -718,22 +984,52 @@ export default function AddProduct() {
                   placeholder="0.00"
                   value={dealOldPrice}
                   onChange={(e) => setDealOldPrice(e.target.value)}
-                  className="form-input deal-input"
-                  min="0"
+                  className={`form-input deal-input${dealPriceError ? " input-invalid" : ""}`}
+                  min="0.01"
+                  step="0.01"
                 />
               </div>
 
               <div className="input-group">
-                <label>Discount (%)</label>
+                <label>Promotional Price (MAD)</label>
                 <input
                   type="number"
-                  placeholder="0"
-                  value={dealDiscount}
-                  onChange={(e) => setDealDiscount(e.target.value)}
-                  className="form-input deal-input"
+                  placeholder="0.00"
+                  value={dealPrice}
+                  onChange={(e) => setDealPrice(e.target.value)}
+                  className={`form-input deal-input${dealPriceError ? " input-invalid" : ""}`}
+                  min="0.01"
+                  step="0.01"
                 />
               </div>
             </div>
+
+            <div className="input-row">
+              <div className="input-group">
+                <label>Discount (auto-calculated)</label>
+                <input
+                  type="text"
+                  value={dealDiscount !== null ? `-${dealDiscount}%` : "—"}
+                  className="form-input deal-input"
+                  readOnly
+                  tabIndex={-1}
+                />
+              </div>
+
+              <div className="input-group">
+                <label>Status</label>
+                <label className="category-checkbox deal-active-toggle">
+                  <input
+                    type="checkbox"
+                    checked={dealActive}
+                    onChange={(e) => setDealActive(e.target.checked)}
+                  />
+                  <span>{dealActive ? "Active — visible in store" : "Inactive — hidden from store"}</span>
+                </label>
+              </div>
+            </div>
+
+            {dealPriceError && <p className="deal-price-error">{dealPriceError}</p>}
 
             <div className="deal-preview">
               {preview ? (
@@ -746,9 +1042,11 @@ export default function AddProduct() {
                   </div>
                 </div>
               ) : (
-                <p className="preview-placeholder">Enter original price and discount to see preview</p>
+                <p className="preview-placeholder">Enter original and promotional prices to see preview</p>
               )}
             </div>
+            </>
+            )}
 
             <div className="input-group">
               <label>Description</label>
@@ -787,6 +1085,7 @@ export default function AddProduct() {
               </div>
             </div>
 
+            {!isBundle && (
             <div className="input-group">
               <label>Stock</label>
               <input
@@ -797,6 +1096,7 @@ export default function AddProduct() {
                 className="form-input deal-input"
               />
             </div>
+            )}
 
             <div className="input-group">
               <label>Categories (Multi-select for deals) - Best Deals is automatic</label>
@@ -860,7 +1160,7 @@ export default function AddProduct() {
             </div>
 
             <div className="input-group">
-              <label>Deal Images (minimum 3, add more below)</label>
+              <label>{isBundle ? "Pack Images (optional — leave empty to show the two product images)" : "Deal Images (minimum 3, add more below)"}</label>
               {dealImages.map((img, i) => (
                 <div key={i} className="dynamic-image-row">
                   <label className="file-upload-box">
@@ -1031,6 +1331,19 @@ export default function AddProduct() {
           </div>
         </div>
       </section>
+      )}
+
+      {featurePrompt && (
+        <div className="bn-modal" role="dialog" aria-modal="true" aria-labelledby="feature-deal-title" onClick={() => setFeaturePrompt(null)}>
+          <div className="bn-modal-box" onClick={(e) => e.stopPropagation()}>
+            <h3 id="feature-deal-title">✅ Deal “{featurePrompt.name}” added</h3>
+            <p>Would you like to feature this deal in a homepage banner? The banner editor opens pre-filled with the deal’s image and prices; nothing is published until you click Publish.</p>
+            <div className="bn-modal-actions">
+              <button type="button" className="bn-btn bn-btn--ghost" onClick={() => setFeaturePrompt(null)}>No, maybe later</button>
+              <button type="button" className="bn-btn" disabled={!featurePrompt.id} onClick={() => navigate(`/dashboard/banners/new?deal=${featurePrompt.id}`)}>Yes, create a banner</button>
+            </div>
+          </div>
+        </div>
       )}
     </main>
   );
