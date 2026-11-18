@@ -54,18 +54,35 @@ export function cartPayload(lines, value) {
  * unit reports 50, not the full 149.
  */
 export function trackAddToCart(item, addedQty = 1, qtyBefore = 0) {
-  const before = qtyBefore > 0 ? lineTotal({ ...item, quantity: qtyBefore }).total : 0;
-  const after = lineTotal({ ...item, quantity: qtyBefore + addedQty }).total;
+  const qty = Number(addedQty);
+  const prevQty = Number(qtyBefore) || 0;
+  // Never send a malformed event: no product, no real price or a bad quantity -> log and skip.
+  if (!item || item.id === undefined || item.id === null || item.id === "" || !Number.isInteger(qty) || qty < 1
+      || !(Number(item.price) > 0)) {
+    console.warn("[Meta Pixel] AddToCart not sent: invalid item, price or quantity", { id: item?.id, price: item?.price, qty });
+    return;
+  }
+  const before = prevQty > 0 ? lineTotal({ ...item, quantity: prevQty }).total : 0;
+  const after = lineTotal({ ...item, quantity: prevQty + qty }).total;
   const value = round2(after - before);
+  if (!Number.isFinite(value) || value < 0) {
+    console.warn("[Meta Pixel] AddToCart not sent: could not compute the value", { id: item.id, value });
+    return;
+  }
   const id = pixelContentId(item);
-  fbTrack("AddToCart", {
-    value,
-    currency: PIXEL_CURRENCY,
-    content_ids: [id],
-    content_name: item.name,
-    content_type: "product",
-    contents: [{ id, quantity: addedQty, item_price: round2(value / addedQty) }],
-  });
+  fbTrack(
+    "AddToCart",
+    {
+      value,
+      currency: PIXEL_CURRENCY,
+      content_ids: [id],
+      content_name: item.name,
+      content_type: "product",
+      contents: [{ id, quantity: qty, item_price: round2(value / qty) }],
+    },
+    // Unique per click, so a future Conversions API event can be deduplicated against it.
+    `atc-${id}-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`
+  );
 }
 
 export function trackViewContent(item) {

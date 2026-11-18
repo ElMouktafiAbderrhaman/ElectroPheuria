@@ -94,16 +94,36 @@ export const api = {
   // Resolves to { path, url }; `path` is what gets saved with the product variant.
   uploadVariantImage: async (file, filename = 'variant.jpg') => {
     const token = sessionStorage.getItem('dashboard_token');
-    const body = new FormData();
-    body.append('image', file, file.name || filename);
-    const response = await fetch(`${API_BASE}/product-variants/images`, {
-      method: 'POST',
-      headers: {
-        'Accept': 'application/json',
-        ...(token ? { 'Authorization': `Bearer ${token}` } : {}),
-      },
-      body,
-    });
+    // A stalled connection makes the server give up (HTTP 408) and the browser reports
+    // "Failed to fetch". Give each attempt 25 s and retry twice before showing an error.
+    let response;
+    for (let attempt = 1; attempt <= 3; attempt++) {
+      const body = new FormData();
+      body.append('image', file, file.name || filename);
+      const controller = new AbortController();
+      const timer = setTimeout(() => controller.abort(), 25000);
+      try {
+        response = await fetch(`${API_BASE}/product-variants/images`, {
+          method: 'POST',
+          headers: {
+            'Accept': 'application/json',
+            ...(token ? { 'Authorization': `Bearer ${token}` } : {}),
+          },
+          body,
+          signal: controller.signal,
+        });
+      } catch {
+        response = null; // network error or timeout
+      } finally {
+        clearTimeout(timer);
+      }
+      const retryable = !response || response.status === 408 || response.status >= 500;
+      if (!retryable || attempt === 3) break;
+      await new Promise((r) => setTimeout(r, 1000 * attempt));
+    }
+    if (!response) {
+      throw new Error('The upload was interrupted (slow or unstable connection). Please check your internet and try again.');
+    }
     const data = await response.json().catch(() => ({}));
     if (!response.ok) {
       const error = new Error(data.message || `Upload failed (${response.status})`);
