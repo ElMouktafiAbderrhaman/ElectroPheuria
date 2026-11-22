@@ -77,7 +77,7 @@ export default function Home() {
   }, [heroImages.length]);
 
   // Orderable deals fill the top slots; "coming soon" teasers only when there are not enough.
-  const activeDeals = dealsList.filter((d) => d.stock > 0 && isDealActive(d)).sort(byAvailability());
+  const activeDeals = dealsList.filter((d) => isDealActive(d) && d.bundle_complete !== false).sort(byAvailability());
 
   return (
     <div className="home-container">

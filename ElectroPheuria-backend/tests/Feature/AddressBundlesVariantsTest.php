@@ -303,9 +303,9 @@ class AddressBundlesVariantsTest extends TestCase
         // Variants on, but none active
         $this->postJson('/api/products', $base + ['variants' => [['type' => 'lightning', 'image_path' => $img, 'active' => false]]])
             ->assertStatus(422)->assertJsonValidationErrors('variants');
-        // Negative stock / zero price
+        // Zero price is refused; negative stock is allowed (units sold but not yet in the shop).
         $this->postJson('/api/products', $base + ['variants' => [['type' => 'lightning', 'image_path' => $img, 'stock' => -1, 'price' => 0]]])
-            ->assertStatus(422)->assertJsonValidationErrors(['variants.0.stock', 'variants.0.price']);
+            ->assertStatus(422)->assertJsonValidationErrors(['variants.0.price'])->assertJsonMissingValidationErrors(['variants.0.stock']);
         // Non-image upload
         $this->post('/api/product-variants/images', ['image' => UploadedFile::fake()->create('x.pdf', 10, 'application/pdf')], ['Accept' => 'application/json'])
             ->assertStatus(422);
@@ -347,17 +347,20 @@ class AddressBundlesVariantsTest extends TestCase
         $this->assertSame(20, Product::find($id)->stock);
     }
 
-    public function test_variant_must_be_selected_active_and_in_stock(): void
+    public function test_variant_must_be_selected_and_active_but_stock_never_blocks(): void
     {
         $this->actingAsAdmin();
         $id = $this->cableProduct(['lightning' => ['stock' => 0], 'usb_c' => ['active' => false]]);
         $variants = Product::find($id)->variants->keyBy('type');
 
-        $this->order([['id' => $id, 'quantity' => 1]])->assertStatus(422);
-        $this->order([['id' => $id, 'variant_id' => $variants['lightning']->id]])->assertStatus(422);
-        $this->order([['id' => $id, 'variant_id' => $variants['usb_c']->id]])->assertStatus(422);
-        $this->order([['id' => $id, 'variant_id' => 999999]])->assertStatus(422);
+        $this->order([['id' => $id, 'quantity' => 1]])->assertStatus(422);                              // no cable chosen
+        $this->order([['id' => $id, 'variant_id' => $variants['usb_c']->id]])->assertStatus(422);       // switched off
+        $this->order([['id' => $id, 'variant_id' => 999999]])->assertStatus(422);                      // unknown
         $this->assertSame(0, Order::count());
+
+        // Out of stock: still sold; the variant stock goes negative (= units to source).
+        $this->order([['id' => $id, 'variant_id' => $variants['lightning']->id, 'quantity' => 2]])->assertCreated();
+        $this->assertSame(-2, $variants['lightning']->fresh()->stock);
     }
 
     public function test_variant_update_replaces_and_cleans_up_images(): void

@@ -1,0 +1,102 @@
+/* Quantity picker: big, thumb-friendly controls in the black & gold theme. */
+.qty-selector {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.qty-label {
+  font-family: 'Montserrat', sans-serif;
+  font-weight: 700;
+  font-size: 0.9rem;
+  color: var(--text-secondary, #b8b8b8);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+
+.qty-control {
+  display: inline-flex;
+  align-items: stretch;
+  align-self: flex-start;
+  border: 2px solid rgba(212, 175, 55, 0.45);
+  border-radius: 14px;
+  overflow: hidden;
+  background: rgba(212, 175, 55, 0.06);
+}
+
+.qty-btn {
+  width: 52px;
+  min-height: 52px;
+  border: none;
+  background: rgba(212, 175, 55, 0.14);
+  color: #FFD700;
+  font-size: 1.6rem;
+  font-weight: 700;
+  line-height: 1;
+  cursor: pointer;
+  transition: background 0.2s ease;
+  touch-action: manipulation;
+}
+
+.qty-btn:hover:not(:disabled) {
+  background: rgba(212, 175, 55, 0.32);
+}
+
+.qty-btn:disabled {
+  opacity: 0.35;
+  cursor: not-allowed;
+}
+
+.qty-input {
+  width: 72px;
+  border: none;
+  background: transparent;
+  color: var(--text-primary, #e8e8e8);
+  font-family: 'Montserrat', sans-serif;
+  font-weight: 800;
+  /* 16px+ stops iOS from zooming into the field */
+  font-size: 1.35rem;
+  text-align: center;
+  outline: none;
+  -moz-appearance: textfield;
+}
+
+.qty-input:focus {
+  background: rgba(212, 175, 55, 0.12);
+}
+
+.qty-hint {
+  margin: 0;
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: #FBBF24;
+}
+
+/* Compact size for cart / checkout lines */
+.qty-sm .qty-control {
+  border-radius: 10px;
+  border-width: 1px;
+}
+
+.qty-sm .qty-btn {
+  width: 40px;
+  min-height: 40px;
+  font-size: 1.3rem;
+}
+
+.qty-sm .qty-input {
+  width: 52px;
+  font-size: 1.1rem;
+}
+
+.qty-sm .qty-label {
+  font-size: 0.75rem;
+}
+
+.qty-selector.is-disabled {
+  opacity: 0.5;
+}
+
+body.light-mode .qty-btn {
+  color: #8a6d0b;
+}

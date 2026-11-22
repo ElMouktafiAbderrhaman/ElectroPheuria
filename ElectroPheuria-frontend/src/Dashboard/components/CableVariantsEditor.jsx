@@ -64,7 +64,8 @@ export const validateVariants = (state) => {
     const v = state.items[type];
     if (!v.image_path) return `Cable variants: upload an image for ${label}.`;
     if (v.price !== "" && v.price !== null && !(Number(v.price) > 0)) return `Cable variants: the ${label} price must be greater than 0.`;
-    if (v.stock !== "" && v.stock !== null && !(Number.isInteger(Number(v.stock)) && Number(v.stock) >= 0)) return `Cable variants: the ${label} stock must be 0 or more.`;
+    // Negative stock is allowed: units already sold that still have to be bought.
+    if (v.stock !== "" && v.stock !== null && !Number.isInteger(Number(v.stock))) return `Cable variants: the ${label} stock must be a whole number.`;
   }
   return "";
 };
@@ -177,7 +178,6 @@ export default function CableVariantsEditor({ value, onChange, productPrice, pro
                     <label>Stock</label>
                     <input
                       type="number"
-                      min="0"
                       step="1"
                       placeholder={productStock !== undefined && productStock !== "" ? `${productStock} (shared)` : "Shared stock"}
                       value={v.stock}

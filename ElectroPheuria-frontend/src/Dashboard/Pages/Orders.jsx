@@ -1,8 +1,10 @@
 // src/pages/Orders.jsx
 import { useState, useEffect } from "react";
+import { Link } from "react-router-dom";
 import api from '../../services/api.js';
 import { orderAmounts } from "../../utils/dealPricing";
 import "./Orders.css"; // Import the CSS file
+import "./PrepareProducts.css";
 
 /** Full delivery address of an order (orders placed before this field existed have none). */
 const orderAddress = (order) => order?.delivery_address || order?.client_data?.delivery_address || "";
@@ -132,6 +134,7 @@ export default function Orders() {
       <div className="orders-header">
         <h1 className="gold-text">Orders</h1>
         <p>Manage and track all customer orders</p>
+        <Link to="/dashboard/prepare" className="prep-link">📦 Products to prepare →</Link>
         <div className="orders-search">
           <input
             type="text"

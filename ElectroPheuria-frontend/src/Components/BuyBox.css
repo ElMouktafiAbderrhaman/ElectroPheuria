@@ -1,0 +1,224 @@
+/* Purchase block on product / deal pages */
+.buy-box {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  margin-top: 22px;
+  padding: 18px;
+  border: 1px solid rgba(212, 175, 55, 0.3);
+  border-radius: 18px;
+  background: rgba(212, 175, 55, 0.04);
+}
+
+.buy-box-qty {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.buy-box-total {
+  margin: 0;
+  font-size: 1rem;
+  color: var(--text-secondary, #b8b8b8);
+}
+
+.buy-box-total strong {
+  color: #FFD700;
+  font-family: 'Montserrat', sans-serif;
+  font-size: 1.2rem;
+}
+
+/* The one primary action: large, gold, impossible to miss, easy to tap. */
+.purchase-now-btn {
+  width: 100%;
+  min-height: 64px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 2px;
+  padding: 16px 24px;
+  border: none;
+  border-radius: 18px;
+  background: linear-gradient(135deg, #D4AF37 0%, #FFD700 50%, #ffed4e 100%);
+  color: #111;
+  font-family: 'Montserrat', sans-serif;
+  cursor: pointer;
+  box-shadow: 0 14px 38px rgba(212, 175, 55, 0.45), inset 0 1px 0 rgba(255, 255, 255, 0.35);
+  transition: transform 0.25s ease, box-shadow 0.25s ease;
+  touch-action: manipulation;
+  animation: purchase-pulse 2.6s ease-in-out infinite;
+}
+
+.purchase-now-btn:hover {
+  transform: translateY(-3px);
+  box-shadow: 0 20px 50px rgba(212, 175, 55, 0.55), inset 0 1px 0 rgba(255, 255, 255, 0.45);
+}
+
+.purchase-now-btn:active {
+  transform: translateY(0) scale(0.99);
+}
+
+.purchase-now-label {
+  font-size: 1.4rem;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.purchase-now-sub {
+  font-size: 0.95rem;
+  font-weight: 700;
+  opacity: 0.8;
+}
+
+@keyframes purchase-pulse {
+  0%, 100% { box-shadow: 0 14px 38px rgba(212, 175, 55, 0.45), inset 0 1px 0 rgba(255, 255, 255, 0.35); }
+  50% { box-shadow: 0 14px 48px rgba(255, 215, 0, 0.7), inset 0 1px 0 rgba(255, 255, 255, 0.35); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .purchase-now-btn { animation: none; }
+}
+
+/* Secondary: smaller, outlined — clearly below "Purchase Now" in the hierarchy. */
+.add-to-cart-secondary {
+  width: 100%;
+  min-height: 48px;
+  padding: 10px 18px;
+  border-radius: 14px;
+  border: 1.5px solid rgba(212, 175, 55, 0.55);
+  background: transparent;
+  color: #e8d48a;
+  font-family: 'Montserrat', sans-serif;
+  font-size: 0.95rem;
+  font-weight: 700;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+  cursor: pointer;
+  transition: background 0.2s ease, color 0.2s ease;
+  touch-action: manipulation;
+}
+
+.add-to-cart-secondary:hover {
+  background: rgba(212, 175, 55, 0.1);
+  color: #FFD700;
+}
+
+body.light-mode .add-to-cart-secondary {
+  color: #8a6d0b;
+}
+
+/* "Added to your cart" confirmation */
+.cart-toast {
+  position: fixed;
+  z-index: 1100;
+  left: 50%;
+  top: 84px;
+  transform: translateX(-50%);
+  width: min(460px, calc(100vw - 24px));
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 14px;
+  border-radius: 16px;
+  border: 1px solid rgba(74, 222, 128, 0.5);
+  background: rgba(17, 17, 17, 0.97);
+  color: #f0f0f0;
+  box-shadow: 0 16px 40px rgba(0, 0, 0, 0.55);
+  animation: toast-in 0.25s ease-out;
+  box-sizing: border-box;
+}
+
+@keyframes toast-in {
+  from { opacity: 0; transform: translate(-50%, -10px); }
+  to { opacity: 1; transform: translate(-50%, 0); }
+}
+
+.cart-toast-icon {
+  flex: none;
+  width: 30px;
+  height: 30px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: #2ecc71;
+  color: #fff;
+  font-weight: 800;
+}
+
+.cart-toast-text {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  font-size: 0.85rem;
+  color: #cfcfcf;
+}
+
+.cart-toast-text strong {
+  color: #f5f5f5;
+  font-size: 0.95rem;
+}
+
+.cart-toast-link {
+  flex: none;
+  padding: 8px 12px;
+  border-radius: 10px;
+  background: linear-gradient(135deg, #D4AF37, #FFD700);
+  color: #111;
+  font-weight: 700;
+  font-size: 0.85rem;
+  text-decoration: none;
+}
+
+.cart-toast-close {
+  flex: none;
+  border: none;
+  background: none;
+  color: #a9a9a9;
+  font-size: 1.3rem;
+  cursor: pointer;
+}
+
+/* Delivery promise */
+.delivery-promise {
+  list-style: none;
+  margin: 18px 0 0;
+  padding: 14px 16px;
+  display: grid;
+  gap: 8px;
+  border-radius: 14px;
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px dashed rgba(212, 175, 55, 0.35);
+  font-size: 0.95rem;
+  color: var(--text-secondary, #b8b8b8);
+}
+
+.delivery-promise li {
+  display: flex;
+  gap: 10px;
+  align-items: flex-start;
+}
+
+.delivery-promise strong {
+  color: var(--text-primary, #e8e8e8);
+}
+
+body.light-mode .buy-box-total strong {
+  color: #8a6d0b;
+}
+
+/* Phones */
+@media (max-width: 768px) {
+  .buy-box {
+    padding: 14px;
+    gap: 12px;
+  }
+  .purchase-now-label {
+    font-size: 1.2rem;
+  }
+}

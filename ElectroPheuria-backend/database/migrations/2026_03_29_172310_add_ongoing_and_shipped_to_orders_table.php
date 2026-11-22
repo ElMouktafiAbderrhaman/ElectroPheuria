@@ -12,6 +12,11 @@ return new class extends Migration
      */
     public function up(): void
     {
+        if (DB::getDriverName() !== 'mysql') {
+            // SQLite (tests): ENUM is a CHECK constraint, so store the status as a plain string.
+            Schema::table('orders', fn (Blueprint $table) => $table->string('status')->default('pending')->change());
+            return;
+        }
         DB::statement("ALTER TABLE orders MODIFY COLUMN status ENUM('pending', 'ongoing', 'done', 'cancelled', 'shipped') DEFAULT 'pending'");
     }
 
@@ -20,6 +25,9 @@ return new class extends Migration
      */
     public function down(): void
     {
+        if (DB::getDriverName() !== 'mysql') {
+            return;
+        }
         DB::statement("ALTER TABLE orders MODIFY COLUMN status ENUM('pending', 'done', 'cancelled') DEFAULT 'pending'");
     }
 };

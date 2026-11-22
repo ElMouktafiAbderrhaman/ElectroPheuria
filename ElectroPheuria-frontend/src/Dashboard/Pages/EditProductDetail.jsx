@@ -500,7 +500,7 @@ export default function EditProductDetail() {
                 value={item.stock || 0}
                 onChange={handleFieldChange}
                 className="form-input"
-                min="0"
+                title="Negative = units sold that still have to be bought"
                 onFocus={clearZero}
               />
             </div>

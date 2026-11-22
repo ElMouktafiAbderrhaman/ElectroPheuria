@@ -60,6 +60,7 @@ export default function DashboardNavbar() {
             <span className="orders-badge">{pendingCount > 99 ? '99+' : pendingCount}</span>
           )}
         </Link>
+        <Link to="/dashboard/prepare" className="navbar-link" onClick={() => setMenuOpen(false)}>To Prepare</Link>
         <Link to="/dashboard/clients" className="navbar-link" onClick={() => setMenuOpen(false)}>Clients</Link>
         <Link to="/dashboard/sales" className="navbar-link" onClick={() => setMenuOpen(false)}>Sales</Link>
         <Link to="/dashboard/edit-products" className="navbar-link" onClick={() => setMenuOpen(false)}>Edit Products</Link>

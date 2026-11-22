@@ -61,6 +61,8 @@ export const api = {
     return Array.isArray(res) ? res : (res.data ?? []);
   },
   getSales: () => apiCall('/orders/history'),
+  // Units to prepare per product over new + confirmed orders (dashboard)
+  getMerchandise: () => apiCall('/orders/merchandise'),
   getStats: () => apiCall('/stats'),  // Keep if this endpoint exists
   getMonthlySales: (year) => apiCall(`/monthly-sales?year=${year}`),
   
@@ -173,6 +175,11 @@ export const api = {
   createOrder: (orderData) => apiCall('/orders', {
     method: 'POST',
     body: JSON.stringify(orderData),
+  }),
+  // Exact amounts the server will record for these lines (offers + delivery), nothing saved.
+  quoteOrder: (products) => apiCall('/orders/quote', {
+    method: 'POST',
+    body: JSON.stringify({ products }),
   }),
 
   updateOrderStatus: (id, status) => apiCall(`/orders/${id}/status`, {

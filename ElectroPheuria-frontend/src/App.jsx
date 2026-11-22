@@ -31,6 +31,7 @@ import DashboardLogin from "./Dashboard/Pages/DashboardLogin";
 import Banners from "./Dashboard/Pages/Banners";
 import BannerEditor from "./Dashboard/Pages/BannerEditor";
 import Tracker from "./Dashboard/Pages/Tracker";
+import PrepareProducts from "./Dashboard/Pages/PrepareProducts";
 import ResetPassword from "./Dashboard/Pages/ResetPassword";
 import ClientDashboard from "./pages/ClientDashboard";
 import ProtectedRoute from "./Dashboard/components/ProtectedRoute";
@@ -123,6 +124,7 @@ export default function App() {
             <Route index element={<DashboardHome />} />
             <Route path="add-product" element={<AddProduct />} />
             <Route path="orders" element={<Orders />} />
+            <Route path="prepare" element={<PrepareProducts />} />
             <Route path="clients" element={<Clients />} />
             <Route path="sales" element={<SalesHistory />} />
             <Route path="banners" element={<Banners />} />

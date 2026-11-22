@@ -128,7 +128,7 @@ class ProductController extends Controller
             'variants.*.type' => ['required', 'string', 'distinct', Rule::in(ProductVariant::TYPES)],
             'variants.*.image_path' => 'required|string|max:255',
             'variants.*.price' => 'nullable|numeric|gt:0|max:9999999',
-            'variants.*.stock' => 'nullable|integer|min:0|max:1000000',
+            'variants.*.stock' => 'nullable|integer|min:-1000000|max:1000000',
             'variants.*.active' => 'nullable|boolean',
         ], [
             'variants.*.type.in' => 'Unknown cable type.',

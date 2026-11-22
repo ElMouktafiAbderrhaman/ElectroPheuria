@@ -1254,3 +1254,106 @@
     text-overflow: ellipsis;
   }
 }
+
+/* ── Purchase Now flow ── */
+/* Short description right under the price: what the product is, before the buy box. */
+.description-section-top {
+  margin: 0 0 18px;
+}
+
+/* Sticky bar (phones): total for the chosen quantity + one big "Purchase Now" button. */
+.sticky-bottom-bar .sticky-price {
+  flex: 0 1 auto;
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+}
+
+.sticky-qty {
+  font-size: 0.8rem;
+  font-weight: 700;
+  color: var(--text-secondary, #b8b8b8);
+  text-shadow: none;
+}
+
+.sticky-bottom-bar .sticky-add-to-cart {
+  flex: 1 1 auto;
+  min-height: 54px;
+  font-size: 1.05rem;
+  font-weight: 800;
+}
+
+@media (max-width: 480px) {
+  .sticky-bottom-bar .sticky-add-to-cart {
+    min-height: 52px;
+    font-size: 1rem;
+  }
+}
+
+/* ── Purchase-first layout ── */
+.you-save-line {
+  margin: -14px 0 16px;
+  font-weight: 700;
+  color: #4ADE80;
+}
+
+.variant-picker-selected {
+  font-weight: 600;
+  font-size: 0.85em;
+  color: #FFD700;
+  text-transform: none;
+  letter-spacing: 0;
+}
+
+.buy-reassure {
+  margin: 12px 0 0;
+  text-align: center;
+  font-size: 0.88rem;
+  color: var(--text-secondary, #b8b8b8);
+}
+
+.product-detail-container > .product-info-sections {
+  max-width: 900px;
+  margin-left: auto;
+  margin-right: auto;
+}
+
+/* Phones: photo, name, price, options, quantity and the buttons as high as possible. */
+@media (max-width: 768px) {
+  .product-detail-main {
+    padding-top: 72px;
+  }
+  .product-detail-content {
+    gap: 14px !important;
+  }
+  .main-image-container {
+    border-radius: 18px;
+  }
+  .main-detail-image {
+    height: min(300px, 36vh);
+  }
+  .thumbnails {
+    display: none;
+  }
+  .detail-info {
+    padding: 18px 16px;
+  }
+  .product-title {
+    font-size: 1.45rem;
+    margin-bottom: 6px;
+  }
+  .price-section,
+  .price-section-deal {
+    margin-bottom: 12px;
+  }
+  .detail-price,
+  .detail-price-deal {
+    font-size: 1.9rem;
+  }
+  .you-save-line {
+    margin: -6px 0 12px;
+  }
+  .variant-picker {
+    margin-bottom: 4px;
+  }
+}

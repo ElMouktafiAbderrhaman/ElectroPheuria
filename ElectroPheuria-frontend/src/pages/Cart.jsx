@@ -6,6 +6,8 @@ import { orderTotals, lineTotal, isBogoDeal, offerLabel, formatPrice } from "../
 import { Link, useNavigate } from "react-router-dom";
 import { useTranslation } from "react-i18next";
 import CartLineExtras, { cartLineImage } from "../Components/CartLineExtras";
+import QuantitySelector from "../Components/QuantitySelector";
+import "../Components/BuyBox.css";
 import "./Cart.css";
 
 export default function Cart() {
@@ -64,28 +66,20 @@ const { cart, updateQuantity, removeFromCart, syncWithCatalog } = useCart();
                 <p className="cart-line-saving">−{formatPrice(lineTotal(item).discount)} MAD</p>
               )}
             </div>
-            <div className="quantity-controls">
-              <button 
-                onClick={() => updateQuantity(item, item.quantity - 1)}
-                disabled={item.quantity <= 1}
-              >
-                -
-              </button>
-              <span className="quantity">{item.quantity}</span>
-              <button 
-                onClick={() => {
-                  if (item.quantity >= (item.stock || 999)) return;
-                  updateQuantity(item, item.quantity + 1);
-                  trackAddToCart(item, 1, item.quantity);
-                }}
-                disabled={item.quantity >= (item.stock || 999)}
-              >
-                +
-              </button>
-            </div>
+            <QuantitySelector
+              size="sm"
+              showLabel={false}
+              className="cart-qty"
+              value={item.quantity}
+              onChange={(q) => {
+                if (q > item.quantity) trackAddToCart(item, q - item.quantity, item.quantity);
+                updateQuantity(item, q);
+              }}
+            />
             <button
               className="remove-button"
               onClick={() => removeFromCart(item)}
+              aria-label={t("remove")}
             >
               🗑️
             </button>
@@ -107,14 +101,12 @@ const { cart, updateQuantity, removeFromCart, syncWithCatalog } = useCart();
 
       <div className="cart-actions">
         <button
-          className="order-button"
+          className="order-button purchase-now-btn"
           onClick={() => navigate("/checkout")}
         >
-          {t("orderNow")}
+          <span className="purchase-now-label">{t("purchaseNow")}</span>
+          <span className="purchase-now-sub"><bdi dir="ltr">{formatPrice(totals.total)}</bdi> {cur}</span>
         </button>
-        <Link to="/products" className="keep-shopping-link">
-          {t("keepShopping")}
-        </Link>
       </div>
     </main>
   );

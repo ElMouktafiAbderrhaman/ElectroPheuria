@@ -1,15 +1,21 @@
-import { useState, useEffect, useRef, useMemo } from "react";
+import { useState, useEffect, useRef, useMemo, useCallback } from "react";
 import { createPortal } from "react-dom";
 import { useParams, useNavigate, useSearchParams } from "react-router-dom";
 import { useTranslation } from "react-i18next";
 import { useCart, cartLineKey } from "../context/CartContext";
 import api from "../services/api";
 import { trackAddToCart, trackViewContent } from "../utils/fbPixel";
-import { isComingSoon, isProductActive, formatPrice, byAvailability } from "../utils/dealPricing";
-import { activeVariants, variantPrice, variantStock, variantImage, variantLabel, variantCartItem, productSoldOut, variantPriceRange } from "../utils/variants";
+import { isComingSoon, isProductActive, formatPrice, byAvailability, lineTotal } from "../utils/dealPricing";
+import { activeVariants, variantPrice, variantImage, variantLabel, variantCartItem, variantPriceRange } from "../utils/variants";
 import { ComingSoonNotice, ComingSoonOverlay } from "../Components/ComingSoon";
+import { buyNowUrl } from "../utils/buyNow";
+import { clampQuantity, parseQuantity } from "../utils/quantity";
 import "./ProductDetail.css";
 import "../Components/VariantPicker.css";
+import BuyBox from "../Components/BuyBox";
+import CartToast from "../Components/CartToast";
+import ProductInfoSections from "../Components/ProductInfoSections";
+import useStickyBuyBar from "../utils/useStickyBuyBar";
 
 export default function ProductDetail() {
   const { id } = useParams();
@@ -32,14 +38,20 @@ export default function ProductDetail() {
   const [variantError, setVariantError] = useState(false);
   const variantPickerRef = useRef(null);
   const [currentImageIndex, setCurrentImageIndex] = useState(0);
+  // Ad links can preselect a quantity: /product/12?qty=2
+  const [quantity, setQuantity] = useState(() => parseQuantity(searchParams.get("qty")) || 1);
 
   useEffect(() => {
+    // A late answer for a previous product must not replace the current one or reset the
+    // customer's cable choice.
+    let stale = false;
     api.getProduct(id)
       .then(p => {
+        if (stale) return;
         setProduct(p);
         // Pre-select the cable type picked on the product card (?variant=usb_c), if available.
         const wanted = searchParams.get("variant");
-        const pre = activeVariants(p).find((v) => v.type === wanted && variantStock(p, v) > 0);
+        const pre = activeVariants(p).find((v) => v.type === wanted);
         setSelectedVariantId(pre ? pre.id : null);
         setVariantError(false);
         setCurrentImageIndex(0);
@@ -47,10 +59,12 @@ export default function ProductDetail() {
         if (p?.id) trackViewContent(p);
       })
       .catch(() => {
+        if (stale) return;
         setProduct(null);
         setLoadingProduct(false);
       });
     api.getProducts().then(setAllProducts).catch(() => {});
+    return () => { stale = true; };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [id]);
 
@@ -58,53 +72,60 @@ export default function ProductDetail() {
     if (!product) return [];
     return allProducts
       .filter(p => isProductActive(p) && p.category === product.category && String(p.id) !== id)
-      .sort(byAvailability(productSoldOut))
+      .sort(byAvailability())
       .slice(0, 6);
   }, [allProducts, product, id]);
 
   const [isSlideAnimating, setIsSlideAnimating] = useState(false);
   const [slideDirection, setSlideDirection] = useState('next');
-  const [footerVisible, setFooterVisible] = useState(false);
   const touchStartX = useRef(null);
-
-  useEffect(() => {
-    const footer = document.querySelector('footer, .footer, .site-footer');
-    if (!footer) return;
-    const observer = new IntersectionObserver(
-      ([entry]) => setFooterVisible(entry.isIntersecting),
-      { threshold: 0 }
-    );
-    observer.observe(footer);
-    return () => observer.disconnect();
-  }, []);
+  const { purchaseRef, showSticky } = useStickyBuyBar();
+  const [toast, setToast] = useState(null);
+  const closeToast = useCallback(() => setToast(null), []);
 
   const variants = activeVariants(product);
   const selectedVariant = variants.find((v) => v.id === selectedVariantId) || null;
 
+  // The line being bought: the chosen cable type, or the product itself (null until a cable is chosen).
+  const currentItem = !product ? null : selectedVariant ? variantCartItem(product, selectedVariant) : variants.length ? null : product;
+
   const selectVariant = (variant) => {
-    if (variantStock(product, variant) <= 0) return;
     setSelectedVariantId(variant.id);
     setVariantError(false);
     setCurrentImageIndex(0); // the chosen cable's image is shown first
   };
 
-  const handleAddToCart = () => {
-    if (!product || isComingSoon(product)) return;
-    // A cable with variants can only be added once a cable type is chosen.
+  /** The item ready to buy, or null after pointing the customer to the missing choice. */
+  const readyItem = () => {
+    if (!product || isComingSoon(product)) return null;
+    // A cable with variants can only be bought once a cable type is chosen.
     if (variants.length > 0 && !selectedVariant) {
       setVariantError(true);
       variantPickerRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' });
-      return;
+      return null;
     }
-    const item = selectedVariant ? variantCartItem(product, selectedVariant) : product;
-    if (item.stock > 0) {
-      const inCart = cart.find((c) => cartLineKey(c) === cartLineKey(item));
-      const qtyBefore = inCart?.quantity || 0;
-      const qtyAfter = Math.min(qtyBefore + 1, item.stock || 999);
-      addToCart(item);
-      if (qtyAfter > qtyBefore) trackAddToCart(item, qtyAfter - qtyBefore, qtyBefore);
-      navigate('/cart');
-    }
+    return currentItem;
+  };
+
+  // Main action: straight to checkout with this item and quantity (the cart is left as it is).
+  const handlePurchaseNow = () => {
+    const item = readyItem();
+    if (!item) return;
+    const qty = clampQuantity(quantity);
+    trackAddToCart(item, qty, 0);
+    navigate(buyNowUrl(item, qty));
+  };
+
+  // Secondary action: add to the cart and stay on the page (to keep shopping).
+  const handleAddToCart = () => {
+    const item = readyItem();
+    if (!item) return;
+    const inCart = cart.find((c) => cartLineKey(c) === cartLineKey(item));
+    const qtyBefore = inCart?.quantity || 0;
+    const qtyAfter = qtyBefore + quantity;
+    addToCart(item, quantity);
+    if (qtyAfter > qtyBefore) trackAddToCart(item, qtyAfter - qtyBefore, qtyBefore);
+    setToast((prev) => ({ id: (prev?.id || 0) + 1, name: item.variant_label ? `${item.name} (${item.variant_label})` : item.name, quantity: qtyAfter - qtyBefore || quantity }));
   };
 
   const goBack = () => {
@@ -112,10 +133,10 @@ export default function ProductDetail() {
   };
 
   const nextImage = () => {
-    if (product && product.images && product.images.length > 0) {
+    if (images.length > 1) {
       setSlideDirection('next');
       setIsSlideAnimating(true);
-      const nextIndex = (currentImageIndex + 1) % product.images.length;
+      const nextIndex = (currentImageIndex + 1) % images.length;
 
       setTimeout(() => {
         setCurrentImageIndex(nextIndex);
@@ -125,10 +146,10 @@ export default function ProductDetail() {
   };
 
   const prevImage = () => {
-    if (product && product.images && product.images.length > 0) {
+    if (images.length > 1) {
       setSlideDirection('prev');
       setIsSlideAnimating(true);
-      const prevIndex = currentImageIndex === 0 ? product.images.length - 1 : currentImageIndex - 1;
+      const prevIndex = currentImageIndex === 0 ? images.length - 1 : currentImageIndex - 1;
 
       setTimeout(() => {
         setCurrentImageIndex(prevIndex);
@@ -191,10 +212,11 @@ export default function ProductDetail() {
       ? `${formatPrice(range.min)} – ${formatPrice(range.max)}`
       : range ? formatPrice(range.min) : (product.new_price || product.price);
   const comingSoon = isComingSoon(product);
-  const soldOut = selectedVariant ? variantStock(product, selectedVariant) <= 0 : productSoldOut(product);
-  const unavailable = comingSoon || soldOut;
-  const buyLabel = comingSoon ? t("comingSoon") : soldOut ? t("soldOut") : t("addToCart");
-  const buyClass = comingSoon ? " coming-soon-btn" : soldOut ? " disabled-btn" : "";
+  // Only "coming soon" stops a purchase: stock never does.
+  const unavailable = comingSoon;
+  const buyLabel = comingSoon ? t("comingSoon") : t("purchaseNow");
+  const qtyTotal = currentItem ? lineTotal({ ...currentItem, quantity }).total : null;
+  const buyClass = comingSoon ? " coming-soon-btn" : "";
 
   return (
     <>
@@ -237,24 +259,6 @@ export default function ProductDetail() {
               </div>
             )}
 
-            {/* Product Specifications Table */}
-            {(Array.isArray(product.specs) && product.specs.length > 0) && (
-              <div className="product-specs-section">
-                <h2 className="specs-title">{t("productSpecs")}</h2>
-                <table className="specs-table">
-                  <tbody>
-                    {product.specs.map((row, i) => (
-                      row.label && (
-                        <tr key={i}>
-                          <td className="spec-label">{row.label}</td>
-                          <td className="spec-value">{row.value}</td>
-                        </tr>
-                      )
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            )}
           </div>
 
           {/* Info Section */}
@@ -270,10 +274,12 @@ export default function ProductDetail() {
 
             {variants.length > 0 && !comingSoon && (
               <div className={`variant-picker${variantError ? ' has-error' : ''}`} ref={variantPickerRef}>
-                <h3 className="variant-picker-title">{t("chooseCableType")}</h3>
+                <h3 className="variant-picker-title">
+                  {t("chooseCableType")}
+                  {selectedVariant && <span className="variant-picker-selected"> · {t("selectedOption")}: <bdi>{variantLabel(selectedVariant)}</bdi></span>}
+                </h3>
                 <div className="variant-options" role="radiogroup" aria-label={t("cableType")}>
                   {variants.map((v) => {
-                    const out = variantStock(product, v) <= 0;
                     const selected = selectedVariant?.id === v.id;
                     return (
                       <button
@@ -281,14 +287,12 @@ export default function ProductDetail() {
                         type="button"
                         role="radio"
                         aria-checked={selected}
-                        disabled={out}
-                        className={`variant-option${selected ? ' selected' : ''}${out ? ' out' : ''}`}
+                        className={`variant-option${selected ? ' selected' : ''}`}
                         onClick={() => selectVariant(v)}
                       >
                         {variantImage(v) && <img src={variantImage(v)} alt="" className="variant-option-img" />}
                         <span className="variant-option-name" dir="ltr">{variantLabel(v)}</span>
                         <span className="variant-option-price" dir="ltr">{formatPrice(variantPrice(product, v))} MAD</span>
-                        {out && <span className="variant-option-out">{t("variantOutOfStock")}</span>}
                         {selected && <span className="variant-option-check" aria-hidden="true">✓</span>}
                       </button>
                     );
@@ -300,46 +304,31 @@ export default function ProductDetail() {
 
             {comingSoon && <ComingSoonNotice />}
 
-            <div className="stock-info">
-              {!comingSoon && soldOut && (
-                <span className="sold-out-detail-badge">{t("soldOut")}</span>
-              )}
-            </div>
 
-            {localized(product.description) && (
-              <div className="description-section">
-                <h3>{t("description")}</h3>
-                <p className="detail-description">{localized(product.description)}</p>
+            {unavailable ? (
+              <div className="add-to-cart-row">
+                <button className={`detail-add-to-cart${buyClass}`} disabled>
+                  {buyLabel}
+                </button>
               </div>
+            ) : (
+              <BuyBox
+                quantity={quantity}
+                setQuantity={setQuantity}
+                qtyTotal={qtyTotal}
+                label={buyLabel}
+                onPurchase={handlePurchaseNow}
+                onAddToCart={handleAddToCart}
+                purchaseRef={purchaseRef}
+              />
             )}
 
-            <div className="add-to-cart-row">
-              <button 
-                onClick={handleAddToCart}
-                className={`detail-add-to-cart${buyClass}`}
-                disabled={unavailable}
-              >
-                {buyLabel}
-              </button>
-              <button onClick={goBack} className="detail-back-button">
-                {t("backToProducts")}
-              </button>
-            </div>
+            <p className="buy-reassure">🚚 {t("deliveryShort")} · 💵 {t("codShort")}</p>
 
-            <div className="reviews-section">
-              <h3>{t("reviews")}</h3>
-              {localized(product.reviews) ? (
-                <div className="reviews-content">
-                  <p className="detail-reviews">{localized(product.reviews)}</p>
-                </div>
-              ) : (
-                <div className="reviews-content add-review-placeholder">
-                  {t("noReviews")}
-                </div>
-              )}
-            </div>
           </div>
         </div>
+
+        <ProductInfoSections item={product} />
 
         {/* Scrolling Gallery Info Images */}
         {Array.isArray(product.gallery) && product.gallery.length > 0 && (
@@ -378,7 +367,7 @@ export default function ProductDetail() {
               {similarProducts.map((item) => (
                 <div 
                   key={item.id} 
-                  className={`similar-product-card${isComingSoon(item) ? ' coming-soon-card' : productSoldOut(item) ? ' sold-out-card' : ''}`}
+                  className={`similar-product-card${isComingSoon(item) ? ' coming-soon-card' : ''}`}
                   onClick={() => {
                     navigate(`/product/${item.id}`);
                     window.scrollTo({ top: 0, behavior: 'smooth' });
@@ -390,11 +379,7 @@ export default function ProductDetail() {
                     ) : (
                       <div className="image-placeholder">📦</div>
                     )}
-                    {isComingSoon(item) ? <ComingSoonOverlay compact /> : productSoldOut(item) && (
-                      <div className="sold-out-overlay">
-                        <span className="sold-out-badge">{t("soldOut")}</span>
-                      </div>
-                    )}
+                    {isComingSoon(item) && <ComingSoonOverlay compact />}
                   </div>
                   <div className="similar-product-info">
                     <h4>{item.name}</h4>
@@ -410,17 +395,18 @@ export default function ProductDetail() {
       </div>
 
       {createPortal(
-        <div className={`sticky-bottom-bar ${footerVisible ? 'hidden' : ''}`}>
-          <button onClick={goBack} className="sticky-back-btn" aria-label={t("backToProducts")}>
-            ←
-          </button>
-          <span className="sticky-price" dir="ltr">{finalPrice} MAD</span>
-          <button onClick={handleAddToCart} className={`sticky-add-to-cart${buyClass}`} disabled={unavailable}>
+        <div className={`sticky-bottom-bar ${showSticky ? '' : 'hidden'}`}>
+          <span className="sticky-price" dir="ltr">
+            {qtyTotal !== null ? formatPrice(qtyTotal) : finalPrice} MAD
+            {quantity > 1 && !unavailable && <small className="sticky-qty">×{quantity}</small>}
+          </span>
+          <button onClick={handlePurchaseNow} className={`sticky-add-to-cart${buyClass}`} disabled={unavailable}>
             {buyLabel}
           </button>
         </div>,
         document.body
       )}
+      <CartToast toast={toast} onClose={closeToast} />
     </>
   );
 }

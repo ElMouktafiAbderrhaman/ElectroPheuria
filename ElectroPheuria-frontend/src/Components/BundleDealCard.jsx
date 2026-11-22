@@ -14,7 +14,8 @@ export default function BundleDealCard({ deal }) {
 
   const products = bundleProducts(deal);
   const comingSoon = isComingSoon(deal);
-  const soldOut = !comingSoon && (deal.bundle_complete === false || Number(deal.stock) <= 0);
+  // A pack is only unavailable when one of its items was removed (never because of stock).
+  const soldOut = !comingSoon && deal.bundle_complete === false;
   const discount = dealDiscount(deal);
   const oldPrice = Number(deal.oldPrice);
   const price = Number(deal.price);

@@ -12,6 +12,7 @@ use App\Models\User;
 use App\Jobs\SendOrderConfirmationEmail;
 use App\Mail\NewOrderNotification;
 use App\Mail\OrderConfirmation;
+use App\Exceptions\OrderRejected;
 use App\Support\OfferPricing;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -38,7 +39,8 @@ class OrderController extends Controller
             'client.address' => 'nullable|string|max:500',
             'products' => 'required|array|min:1',
             'products.*.id' => 'required',
-            'products.*.quantity' => 'nullable|integer|min:1|max:100',
+            // Any positive whole number: stock never limits what a customer can order.
+            'products.*.quantity' => 'nullable|integer|min:1',
             // Selected cable variant (Lightning / USB Type-C) for products that have variants.
             'products.*.variant_id' => 'nullable|integer',
             // Packs: cable type chosen for each pack product that has variants, {productId: variantId}.
@@ -46,6 +48,8 @@ class OrderController extends Controller
             // Ignored: subtotal, delivery fee and total are recomputed on the server below.
             'total_price' => 'nullable|numeric',
             'delivery_fee' => 'nullable|numeric',
+            // Total shown to the customer when they confirmed; the order is refused (409) if it differs.
+            'expected_total' => 'nullable|numeric',
             // Website language the customer was browsing in (en/fr/ar); defaults to fr.
             'locale' => 'nullable|string|max:10',
         ], [
@@ -70,22 +74,97 @@ class OrderController extends Controller
         $clientInput['email'] = OrderConfirmation::deliverableEmail($clientInput['email'] ?? null);
         $locale = OrderConfirmation::normalizeLocale($request->input('locale'));
 
-        // Price every line from the database, never from client-sent values.
-        // Lines for the same item are merged so offers apply to the full quantity.
+        try {
+            $priced = $this->priceOrder($request->products);
+        } catch (OrderRejected $e) {
+            return response()->json(['message' => $e->getMessage()], 422);
+        }
+        ['lines' => $lines, 'orderLines' => $orderLines, 'subtotal' => $subtotal, 'deliveryFee' => $deliveryFee, 'total' => $total] = $priced;
+
+        // The customer confirmed a total on the checkout page: never record a different amount.
+        if ($request->filled('expected_total') && abs((float) $request->input('expected_total') - $total) > 0.009) {
+            return response()->json([
+                'message' => 'Prices changed since you opened the checkout. Please check the new total and confirm again.',
+                'code' => 'total_changed',
+                'quote' => $this->quotePayload($priced),
+            ], 409);
+        }
+
+        // Units each stock source (product, deal or cable variant) must supply, all lines together.
+        $demands = $this->stockDemands($lines);
+
+        $order = DB::transaction(function () use ($clientInput, $locale, $demands, $orderLines, $subtotal, $deliveryFee, $total) {
+            // Take the units from stock. Stock may go below zero: −3 means 3 units were
+            // sold that the shop still has to source ("Products to prepare" shows it).
+            $this->takeStock($demands);
+
+            $clientData = $clientInput;
+            $client = Client::updateOrCreate(
+                ['phone' => $clientData['phone']],
+                [
+                    'name' => $clientData['name'],
+                    'email' => $clientData['email'] ?? null,
+                    // clients.address is a 255-char column; the full address lives on the order.
+                    'address' => Str::limit($clientData['delivery_address'] . ', ' . $clientData['city'], 255, ''),
+                ]
+            );
+
+            $order = Order::create([
+                'client_id' => $client->id,
+                'client_data' => $clientData,
+                'delivery_address' => $clientData['delivery_address'],
+                'products' => $orderLines,
+                'subtotal' => $subtotal,
+                'delivery_fee' => $deliveryFee,
+                'total_price' => $total,
+                'status' => 'pending',
+                'locale' => $locale,
+            ]);
+
+            // Send email notification to admin + all users
+            try {
+                $products = $orderLines;
+
+                $recipients = User::whereNotNull('email')->pluck('email')->toArray();
+                $adminEmail = config('mail.from.address');
+                if (!in_array($adminEmail, $recipients)) {
+                    $recipients[] = $adminEmail;
+                }
+
+                Mail::to($recipients)->send(new NewOrderNotification($order, $clientData, $products));
+            } catch (\Throwable $e) {
+                \Log::error('Failed to send order email: ' . $e->getMessage());
+            }
+
+            return $order;
+            });
+
+        // The order is committed at this point. The customer's confirmation is
+        // queued; any problem with it is logged and never fails the checkout.
+        $this->queueCustomerConfirmation($order);
+
+        return response()->json($order->load('client'), 201);
+    }
+
+    /**
+     * Price the requested lines from the database (never from client-sent values).
+     * Lines for the same item are merged so offers apply to the full quantity.
+     * Used by both the order and the checkout quote, so they always agree.
+     *
+     * @throws OrderRejected
+     */
+    private function priceOrder(array $products): array
+    {
         $lines = [];
-        foreach ($request->products as $item) {
+        foreach ($products as $item) {
             $isDeal = !empty($item['isDeal']) || !empty($item['oldPrice']) || !empty($item['old_price']);
             $model = $isDeal ? Deal::with(Deal::BUNDLE_WITH)->find($item['id']) : Product::with('variants')->find($item['id']);
 
             if (!$model || !$model->active) {
-                return response()->json([
-                    'message' => 'This item is no longer available: ' . ($model->name ?? $item['name'] ?? $item['id']),
-                ], 422);
+                throw new OrderRejected('This item is no longer available: ' . ($model->name ?? $item['name'] ?? $item['id']));
             }
             if ($model->coming_soon) {
-                return response()->json([
-                    'message' => 'This item is coming soon and cannot be ordered yet: ' . $model->name,
-                ], 422);
+                throw new OrderRejected('This item is coming soon and cannot be ordered yet: ' . $model->name);
             }
 
             // Bundle deal: both items must still exist and be orderable, and every pack
@@ -93,9 +172,7 @@ class OrderController extends Controller
             $bundleChoices = [];
             if ($isDeal && $model->isBundle()) {
                 if ($model->bundleItems->count() !== 2 || $model->bundleItems->contains(fn ($row) => !$row->isAvailable())) {
-                    return response()->json([
-                        'message' => 'This bundle is no longer available: ' . $model->name,
-                    ], 422);
+                    throw new OrderRejected('This bundle is no longer available: ' . $model->name);
                 }
                 $picked = is_array($item['bundle_variants'] ?? null) ? $item['bundle_variants'] : [];
                 foreach ($model->bundleItems as $row) {
@@ -106,14 +183,7 @@ class OrderController extends Controller
                     }
                     $chosen = $choices->firstWhere('id', (int) ($picked[$row->choiceKey()] ?? 0));
                     if (!$chosen) {
-                        return response()->json([
-                            'message' => 'Please choose a cable type for ' . $row->item()->name . ' in: ' . $model->name,
-                        ], 422);
-                    }
-                    if ($chosen->availableStock($row->item()) <= 0) {
-                        return response()->json([
-                            'message' => 'This cable type is out of stock: ' . $row->item()->name . ' (' . $chosen->label . ')',
-                        ], 422);
+                        throw new OrderRejected('Please choose a cable type for ' . $row->item()->name . ' in: ' . $model->name);
                     }
                     $bundleChoices[$row->id] = $chosen;
                 }
@@ -126,14 +196,7 @@ class OrderController extends Controller
                 if ($activeVariants->isNotEmpty()) {
                     $variant = $activeVariants->firstWhere('id', (int) ($item['variant_id'] ?? 0));
                     if (!$variant) {
-                        return response()->json([
-                            'message' => 'Please choose a cable type for: ' . $model->name,
-                        ], 422);
-                    }
-                    if ($variant->availableStock($model) <= 0) {
-                        return response()->json([
-                            'message' => 'This cable type is out of stock: ' . $model->name . ' (' . $variant->label . ')',
-                        ], 422);
+                        throw new OrderRejected('Please choose a cable type for: ' . $model->name);
                     }
                 }
             }
@@ -202,76 +265,102 @@ class OrderController extends Controller
         $deliveryFee = round((float) config('shop.delivery_fee'), 2);
         $total = round($subtotal + $deliveryFee, 2);
 
-        $order = DB::transaction(function () use ($clientInput, $locale, $lines, $orderLines, $subtotal, $deliveryFee, $total) {
-            $clientData = $clientInput;
-            $client = Client::updateOrCreate(
-                ['phone' => $clientData['phone']],
-                [
-                    'name' => $clientData['name'],
-                    'email' => $clientData['email'] ?? null,
-                    // clients.address is a 255-char column; the full address lives on the order.
-                    'address' => Str::limit($clientData['delivery_address'] . ', ' . $clientData['city'], 255, ''),
-                ]
-            );
-
-            // Decrement stock for each ordered product / deal / bundle product / cable variant
-            foreach ($lines as $line) {
-                $model = $line['model'];
-                if ($line['variant'] && $line['variant']->stock !== null) {
-                    $this->decrementStock($line['variant'], $line['quantity']);
-                } elseif ($line['isDeal'] && $model->isBundle()) {
-                    foreach ($model->bundleItems as $row) {
-                        $chosen = $line['bundleChoices'][$row->id] ?? null;
-                        // The chosen cable's own stock, else the product's / bundled deal's stock.
-                        $this->decrementStock($chosen && $chosen->stock !== null ? $chosen : $row->item(), $line['quantity'] * $row->units());
-                    }
-                } else {
-                    $this->decrementStock($model, $line['quantity']);
-                }
-            }
-
-            $order = Order::create([
-                'client_id' => $client->id,
-                'client_data' => $clientData,
-                'delivery_address' => $clientData['delivery_address'],
-                'products' => $orderLines,
-                'subtotal' => $subtotal,
-                'delivery_fee' => $deliveryFee,
-                'total_price' => $total,
-                'status' => 'pending',
-                'locale' => $locale,
-            ]);
-
-            // Send email notification to admin + all users
-            try {
-                $products = $orderLines;
-
-                $recipients = User::whereNotNull('email')->pluck('email')->toArray();
-                $adminEmail = config('mail.from.address');
-                if (!in_array($adminEmail, $recipients)) {
-                    $recipients[] = $adminEmail;
-                }
-
-                Mail::to($recipients)->send(new NewOrderNotification($order, $clientData, $products));
-            } catch (\Throwable $e) {
-                \Log::error('Failed to send order email: ' . $e->getMessage());
-            }
-
-            return $order;
-        });
-
-        // The order is committed at this point. The customer's confirmation is
-        // queued; any problem with it is logged and never fails the checkout.
-        $this->queueCustomerConfirmation($order);
-
-        return response()->json($order->load('client'), 201);
+        return compact('lines', 'orderLines', 'subtotal', 'deliveryFee', 'total');
     }
 
-    private function decrementStock($model, int $quantity): void
+    /**
+     * POST /api/orders/quote — the exact amounts the server will record for these lines
+     * (offers, delivery fee, total). Nothing is saved.
+     */
+    public function quote(Request $request)
     {
-        $model->decrement('stock', $quantity);
-        if ($model->stock < 0) {
-            $model->update(['stock' => 0]);
+        $request->validate([
+            'products' => 'required|array|min:1',
+            'products.*.id' => 'required',
+            'products.*.quantity' => 'nullable|integer|min:1',
+            'products.*.variant_id' => 'nullable|integer',
+            'products.*.bundle_variants' => 'nullable|array',
+        ]);
+
+        try {
+            $priced = $this->priceOrder($request->products);
+        } catch (OrderRejected $e) {
+            return response()->json(['message' => $e->getMessage()], 422);
+        }
+
+        return response()->json($this->quotePayload($priced));
+    }
+
+    /** Amounts of a priced order, per line and in total, as shown in the checkout summary. */
+    private function quotePayload(array $priced): array
+    {
+        $lines = array_map(fn ($line) => [
+            'id' => $line['id'],
+            'isDeal' => !empty($line['isDeal']),
+            'name' => $line['name'],
+            'variant_id' => $line['variant_id'] ?? null,
+            'variant_label' => $line['variant_label'] ?? null,
+            'quantity' => $line['quantity'],
+            'unit_price' => $line['price'],
+            'line_subtotal' => $line['line_subtotal'],
+            'discount' => $line['offer_discount'],
+            'line_total' => $line['line_total'],
+        ], $priced['orderLines']);
+
+        return [
+            'lines' => $lines,
+            // Before offers, offer savings, after offers.
+            'products_subtotal' => round(array_sum(array_column($lines, 'line_subtotal')), 2),
+            'discount' => round(array_sum(array_column($lines, 'discount')), 2),
+            'subtotal' => $priced['subtotal'],
+            'delivery_fee' => $priced['deliveryFee'],
+            'total' => $priced['total'],
+            'items' => array_sum(array_column($lines, 'quantity')),
+        ];
+    }
+
+    /**
+     * Units to take from each stock source for the given order lines:
+     * a cable variant with its own stock, else the product / deal; packs draw on their items.
+     *
+     * @return array<string, array{model: \Illuminate\Database\Eloquent\Model, quantity: int, name: string}>
+     */
+    private function stockDemands(array $lines): array
+    {
+        $demands = [];
+        $add = function ($model, int $quantity, string $name) use (&$demands) {
+            $key = get_class($model) . ':' . $model->getKey();
+            $demands[$key] ??= ['model' => $model, 'quantity' => 0, 'name' => $name];
+            $demands[$key]['quantity'] += $quantity;
+        };
+
+        foreach ($lines as $line) {
+            $model = $line['model'];
+            $variant = $line['variant'];
+            if ($variant && $variant->stock !== null) {
+                $add($variant, $line['quantity'], $model->name . ' (' . $variant->label . ')');
+            } elseif ($line['isDeal'] && $model->isBundle()) {
+                foreach ($model->bundleItems as $row) {
+                    $chosen = $line['bundleChoices'][$row->id] ?? null;
+                    $item = $row->item();
+                    // The chosen cable's own stock, else the product's / bundled deal's stock.
+                    $chosen && $chosen->stock !== null
+                        ? $add($chosen, $line['quantity'] * $row->units(), $item->name . ' (' . $chosen->label . ')')
+                        : $add($item, $line['quantity'] * $row->units(), $item->name);
+                }
+            } else {
+                $add($model, $line['quantity'], $model->name);
+            }
+        }
+
+        return $demands;
+    }
+
+    /** Take the ordered units from each stock source (may go negative = units still to source). */
+    private function takeStock(array $demands): void
+    {
+        foreach ($demands as $demand) {
+            $demand['model']->newQuery()->whereKey($demand['model']->getKey())->decrement('stock', $demand['quantity']);
         }
     }
 
@@ -386,6 +475,111 @@ class OrderController extends Controller
     {
         $orders = Order::with('client')->whereIn('status', ['done', 'cancelled', 'shipped', 'refunded'])->get();
         return view('orders.history', compact('orders'));
+    }
+
+    /** Orders whose items still have to be prepared: new (pending) and confirmed (ongoing). */
+    public const TO_PREPARE_STATUSES = ['pending', 'ongoing'];
+
+    /**
+     * GET /api/orders/merchandise — units to prepare per catalogue item over all orders
+     * that are not shipped, done, cancelled or refunded. Packs count as their items.
+     * Items are grouped by product / deal id (not name), with the orders that need them.
+     */
+    public function merchandise()
+    {
+        $orders = Order::with('client')
+            ->whereIn('status', self::TO_PREPARE_STATUSES)
+            ->orderBy('id')
+            ->get();
+
+        $groups = [];
+        $add = function (array $line, int $units, Order $order, ?string $via) use (&$groups) {
+            if ($units <= 0 || !isset($line['id'])) {
+                return;
+            }
+            $kind = !empty($line['isDeal']) || ($line['kind'] ?? null) === DealBundleItem::KIND_DEAL ? 'deal' : 'product';
+            $key = $kind . '-' . $line['id'];
+            $groups[$key] ??= [
+                'key' => $key,
+                'kind' => $kind,
+                'id' => (int) $line['id'],
+                'name' => (string) ($line['name'] ?? ''),
+                'total' => 0,
+                'confirmed' => 0,
+                'pending' => 0,
+                'variants' => [],
+                'orders' => [],
+            ];
+            $group = &$groups[$key];
+            $group['total'] += $units;
+            $group[$order->status === 'ongoing' ? 'confirmed' : 'pending'] += $units;
+            $variant = $line['variant_label'] ?? null;
+            if ($variant) {
+                $group['variants'][$variant] = ($group['variants'][$variant] ?? 0) + $units;
+            }
+            $group['orders'][] = [
+                'order_id' => $order->id,
+                'status' => $order->status,
+                'quantity' => $units,
+                'variant_label' => $variant,
+                'via_pack' => $via,
+                'customer' => $order->client_data['name'] ?? $order->client?->name,
+                'city' => $order->client_data['city'] ?? null,
+                'created_at' => $order->created_at?->toIso8601String(),
+            ];
+            unset($group);
+        };
+
+        foreach ($orders as $order) {
+            foreach ((is_array($order->products) ? $order->products : []) as $line) {
+                $quantity = max((int) ($line['quantity'] ?? 1), 1);
+                if (($line['deal_type'] ?? null) === Deal::TYPE_BUNDLE) {
+                    // A pack is prepared as its items: ×(pack quantity × units per pack).
+                    foreach ($line['bundle_items'] ?? [] as $item) {
+                        $add($item, $quantity * max((int) ($item['quantity'] ?? 1), 1), $order, $line['name'] ?? null);
+                    }
+                } else {
+                    $add($line, $quantity, $order, null);
+                }
+            }
+        }
+
+        // Current name, picture and stock left from the catalogue (the item may have been renamed).
+        $ids = fn ($kind) => collect($groups)->where('kind', $kind)->pluck('id')->all();
+        $catalogue = [
+            'product' => Product::with('variants')->whereIn('id', $ids('product'))->get()->keyBy('id'),
+            'deal' => Deal::whereIn('id', $ids('deal'))->get()->keyBy('id'),
+        ];
+
+        $items = collect($groups)->map(function ($group) use ($catalogue) {
+            $model = $catalogue[$group['kind']][$group['id']] ?? null;
+            $images = $model && is_array($model->images) ? $model->images : [];
+            $group['name'] = $model->name ?? $group['name'];
+            $group['image'] = $images[0] ?? null;
+            // Stock already has every open order taken off, and may be negative: −3 = 3 units
+            // sold that are not in the shop. Cable types with their own stock count separately.
+            $sources = $model ? collect([$model])->concat(
+                $model instanceof Product ? $model->variants->whereNotNull('stock') : []
+            ) : collect();
+            $group['in_stock'] = $model ? (int) $sources->sum(fn ($s) => max((int) $s->stock, 0)) : null;
+            $group['to_source'] = (int) $sources->sum(fn ($s) => max(-(int) $s->stock, 0));
+            $group['orders_count'] = collect($group['orders'])->pluck('order_id')->unique()->count();
+            $group['variants'] = collect($group['variants'])
+                ->map(fn ($units, $label) => ['label' => $label, 'quantity' => $units])
+                ->values()->all();
+            return $group;
+        })->sortBy([['total', 'desc'], ['name', 'asc']])->values();
+
+        return response()->json([
+            'statuses' => self::TO_PREPARE_STATUSES,
+            'orders_count' => $orders->count(),
+            'pending_orders' => $orders->where('status', 'pending')->count(),
+            'confirmed_orders' => $orders->where('status', 'ongoing')->count(),
+            'total_units' => $items->sum('total'),
+            'total_to_source' => $items->sum('to_source'),
+            'items' => $items,
+            'generated_at' => now()->toIso8601String(),
+        ]);
     }
 
     public function stats()

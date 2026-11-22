@@ -6,7 +6,7 @@ import api from "../services/api";
 import { dealDiscount, formatPrice, isDealActive, isProductActive, isBogoDeal, isComingSoon, offerLabel, offerBadge, byAvailability } from "../utils/dealPricing";
 import { ComingSoonOverlay } from "../Components/ComingSoon";
 import BundleDealCard from "../Components/BundleDealCard";
-import { activeVariants, variantImage, variantLabel, variantPrice, variantStock, variantPriceRange, productSoldOut, isBundleDeal } from "../utils/variants";
+import { activeVariants, variantImage, variantLabel, variantPrice, variantPriceRange, isBundleDeal } from "../utils/variants";
 import "../Components/VariantPicker.css";
 import "./Products.css";
 
@@ -104,12 +104,13 @@ export default function Products() {
         : true;
 
       return matchesCategory && matchesSearch;
-    }).sort(byAvailability(productSoldOut)); // available first, coming soon last
+    }).sort(byAvailability()); // available first, coming soon last
   }, [productsList, selectedCategory, searchQuery]);
 
   const filteredDeals = useMemo(() => {
     return dealsList.filter((deal) => {
-      if (!isDealActive(deal)) return false;
+      // A pack missing one of its items cannot be sent: not listed (stock never hides anything).
+      if (!isDealActive(deal) || deal.bundle_complete === false) return false;
       const categories = Array.isArray(deal.categories) ? deal.categories : [deal.category || ""];
       // If "golden" category is selected, show all deals
       const matchesCategory = selectedCategory === "golden" || selectedCategory === null || categories.includes(selectedCategory);
@@ -181,11 +182,10 @@ export default function Products() {
               const cardPrice = chosen
                 ? formatPrice(variantPrice(product, chosen))
                 : range ? (range.min !== range.max ? `${formatPrice(range.min)} – ${formatPrice(range.max)}` : formatPrice(range.min)) : product.price;
-              const soldOut = productSoldOut(product);
               return (
               <div
                 key={product.id}
-                className={`product-card${isComingSoon(product) ? ' coming-soon-card' : soldOut ? ' sold-out-card' : ''}`}
+                className={`product-card${isComingSoon(product) ? ' coming-soon-card' : ''}`}
                 onClick={() => navigate(`/product/${product.id}${chosen ? `?variant=${chosen.type}` : ''}`)}
                 style={{cursor: 'pointer'}}
               >
@@ -195,11 +195,7 @@ export default function Products() {
                   ) : (
                     <div className="image-placeholder">📦</div>
                   )}
-                  {isComingSoon(product) ? <ComingSoonOverlay /> : soldOut && (
-                    <div className="sold-out-overlay">
-                      <span className="sold-out-badge">{t("soldOut")}</span>
-                    </div>
-                  )}
+                  {isComingSoon(product) && <ComingSoonOverlay />}
                 </div>
 
                 <div className="product-info">
@@ -207,19 +203,18 @@ export default function Products() {
                   {variants.length > 0 && !isComingSoon(product) && (
                     <div className="variant-chips" role="radiogroup" aria-label={t("cableType")}>
                       {variants.map((v) => {
-                        const out = variantStock(product, v) <= 0;
                         return (
                           <button
                             key={v.id}
                             type="button"
                             role="radio"
                             aria-checked={chosen?.id === v.id}
-                            className={`variant-chip${chosen?.id === v.id ? ' selected' : ''}${out ? ' out' : ''}`}
+                            className={`variant-chip${chosen?.id === v.id ? ' selected' : ''}`}
                             onClick={(e) => {
                               e.stopPropagation();
-                              if (!out) setCardVariant((prev) => ({ ...prev, [product.id]: v.type }));
+                              setCardVariant((prev) => ({ ...prev, [product.id]: v.type }));
                             }}
-                            title={out ? t("variantOutOfStock") : variantLabel(v)}
+                            title={variantLabel(v)}
                           >
                             {variantImage(v) && <img src={variantImage(v)} alt="" />}
                             <span dir="ltr">{variantLabel(v)}</span>
@@ -239,7 +234,7 @@ export default function Products() {
             ) : (
               <div
                 key={deal.id}
-                className={`product-card golden-card${isComingSoon(deal) ? ' coming-soon-card' : deal.stock <= 0 ? ' sold-out-card' : ''}`}
+                className={`product-card golden-card${isComingSoon(deal) ? ' coming-soon-card' : ''}`}
                 onClick={() => navigate(`/deal/${deal.id}`)}
                 style={{cursor: 'pointer'}}
               >
@@ -255,11 +250,7 @@ export default function Products() {
                   ) : dealDiscount(deal) !== null && (
                     <span className="deal-discount-corner">-{dealDiscount(deal)}%</span>
                   )}
-                  {isComingSoon(deal) ? <ComingSoonOverlay /> : deal.stock <= 0 && (
-                    <div className="sold-out-overlay">
-                      <span className="sold-out-badge">{t("soldOut")}</span>
-                    </div>
-                  )}
+                  {isComingSoon(deal) && <ComingSoonOverlay />}
                 </div>
 
                 <div className="product-info">

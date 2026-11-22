@@ -154,11 +154,10 @@ export function orderAmounts(order) {
 }
 
 /**
- * Storefront order: items customers can buy now first, then sold-out items,
- * then "coming soon" teasers. Array.sort is stable, so the catalog order is kept inside each group.
- * `soldOut` lets products with cable variants pass their own sold-out check.
+ * Storefront order: items customers can buy now first, then "coming soon" teasers.
+ * Stock plays no part: everything that is not "coming soon" can be ordered.
+ * Array.sort is stable, so the catalog order is kept inside each group.
  */
-export const availabilityRank = (item, soldOut = (i) => Number(i?.stock) <= 0) =>
-  isComingSoon(item) ? 2 : soldOut(item) ? 1 : 0;
+export const availabilityRank = (item) => (isComingSoon(item) ? 1 : 0);
 
-export const byAvailability = (soldOut) => (a, b) => availabilityRank(a, soldOut) - availabilityRank(b, soldOut);
+export const byAvailability = () => (a, b) => availabilityRank(a) - availabilityRank(b);

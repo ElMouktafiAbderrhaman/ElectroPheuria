@@ -1,15 +1,21 @@
-import { useState, useEffect, useRef, useMemo } from "react";
+import { useState, useEffect, useRef, useMemo, useCallback } from "react";
 import { createPortal } from "react-dom";
-import { useParams, useNavigate } from "react-router-dom";
+import { useParams, useNavigate, useSearchParams } from "react-router-dom";
 import { useTranslation } from "react-i18next";
 import { useCart } from "../context/CartContext";
 import api from "../services/api";
 import { dealDiscount, formatPrice, isDealActive, isBogoDeal, isBogoFixedDeal, isComingSoon, lineTotal, offerLabel, byAvailability } from "../utils/dealPricing";
 import { ComingSoonNotice, ComingSoonOverlay } from "../Components/ComingSoon";
 import { trackAddToCart, trackViewContent } from "../utils/fbPixel";
-import { isBundleDeal, bundleProducts, bundleItemImage, bundleItemKey, bundleCableItems, bundleChoiceId, bundleChoicesComplete, bundleCartItem, activeVariants, variantCartItem, variantStock, variantImage, variantLabel } from "../utils/variants";
+import { isBundleDeal, bundleProducts, bundleItemImage, bundleItemKey, bundleCableItems, bundleChoiceId, bundleChoicesComplete, bundleCartItem, activeVariants, variantCartItem, variantImage, variantLabel } from "../utils/variants";
 import { cartLineKey } from "../context/CartContext";
 import "../Components/VariantPicker.css";
+import BuyBox from "../Components/BuyBox";
+import CartToast from "../Components/CartToast";
+import ProductInfoSections from "../Components/ProductInfoSections";
+import useStickyBuyBar from "../utils/useStickyBuyBar";
+import { buyNowUrl } from "../utils/buyNow";
+import { clampQuantity, parseQuantity } from "../utils/quantity";
 import "./ProductDetail.css";
 import "./DealDetail.css";
 
@@ -37,9 +43,16 @@ export default function DealDetail() {
   const [selectedVariantId, setSelectedVariantId] = useState(null);
   const [variantError, setVariantError] = useState(false);
   const variantPickerRef = useRef(null);
+  // Ad links can preselect a quantity: /deal/3?qty=2
+  const [searchParams] = useSearchParams();
+  const [quantity, setQuantity] = useState(() => parseQuantity(searchParams.get("qty")) || 1);
   useEffect(() => {
+    // A late answer for a previous deal must not replace the current one or reset the
+    // customer's cable choices.
+    let stale = false;
     api.getDeal(id)
       .then(d => {
+        if (stale) return;
         setDeal(d);
         setPackCables({});
         setPackCableError(false);
@@ -49,10 +62,12 @@ export default function DealDetail() {
         if (d?.id) trackViewContent({ ...d, isDeal: true });
       })
       .catch(() => {
+        if (stale) return;
         setDeal(null);
         setLoadingDeal(false);
       });
     api.getDeals().then(setAllDeals).catch(() => {});
+    return () => { stale = true; };
   }, [id]);
 
   const similarDeals = useMemo(() => {
@@ -71,46 +86,59 @@ export default function DealDetail() {
   const [currentImageIndex, setCurrentImageIndex] = useState(0);
   const [isSlideAnimating, setIsSlideAnimating] = useState(false);
   const [slideDirection, setSlideDirection] = useState('next');
-  const [footerVisible, setFooterVisible] = useState(false);
   const touchStartX = useRef(null);
-
-  useEffect(() => {
-    const footer = document.querySelector('footer, .footer, .site-footer');
-    if (!footer) return;
-    const observer = new IntersectionObserver(
-      ([entry]) => setFooterVisible(entry.isIntersecting),
-      { threshold: 0 }
-    );
-    observer.observe(footer);
-    return () => observer.disconnect();
-  }, []);
+  const { purchaseRef, showSticky } = useStickyBuyBar();
+  const [toast, setToast] = useState(null);
+  const closeToast = useCallback(() => setToast(null), []);
 
   const dealVariants = isBundleDeal(deal) ? [] : activeVariants(deal);
   const selectedVariant = dealVariants.find((v) => v.id === selectedVariantId) || null;
 
-  const handleAddToCart = () => {
-    if (deal && deal.stock > 0 && !isComingSoon(deal) && deal.bundle_complete !== false) {
-      // A pack with a cable item can only be added once every cable type is chosen.
-      if (!bundleChoicesComplete(deal, packCables)) {
-        setPackCableError(true);
-        packPickerRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' });
-        return;
-      }
-      // A deal with cable variants can only be added once a cable type is chosen.
-      if (dealVariants.length > 0 && !selectedVariant) {
-        setVariantError(true);
-        variantPickerRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' });
-        return;
-      }
-      const item = selectedVariant ? variantCartItem({ ...deal, isDeal: true }, selectedVariant) : bundleCartItem(deal, packCables);
-      const inCart = cart.find((c) => cartLineKey(c) === cartLineKey(item));
-      const qtyBefore = inCart?.quantity || 0;
-      const qtyAfter = Math.min(qtyBefore + 1, item.stock || 999);
-      addToCart(item, 1);
-      // Only report units that were really added (the cart caps quantity at stock).
-      if (qtyAfter > qtyBefore) trackAddToCart(item, qtyAfter - qtyBefore, qtyBefore);
-      navigate('/cart');
+  // The line being bought (chosen cable / pack cables), or the deal itself while a choice is missing.
+  const currentItem = !deal
+    ? null
+    : selectedVariant
+      ? variantCartItem({ ...deal, isDeal: true }, selectedVariant)
+      : bundleCartItem(deal, packCables);
+
+  /** The item ready to buy, or null after pointing the customer to the missing choice. */
+  const readyItem = () => {
+    if (!deal || isComingSoon(deal) || deal.bundle_complete === false) return null;
+    // A pack with a cable item can only be bought once every cable type is chosen.
+    if (!bundleChoicesComplete(deal, packCables)) {
+      setPackCableError(true);
+      packPickerRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      return null;
     }
+    // A deal with cable variants can only be bought once a cable type is chosen.
+    if (dealVariants.length > 0 && !selectedVariant) {
+      setVariantError(true);
+      variantPickerRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      return null;
+    }
+    return currentItem;
+  };
+
+  // Main action: straight to checkout with this deal and quantity (the cart is left as it is).
+  const handlePurchaseNow = () => {
+    const item = readyItem();
+    if (!item) return;
+    const qty = clampQuantity(quantity);
+    trackAddToCart(item, qty, 0);
+    navigate(buyNowUrl(item, qty));
+  };
+
+  // Secondary action: keep it in the cart to order several items together.
+  const handleAddToCart = () => {
+    const item = readyItem();
+    if (!item) return;
+    const inCart = cart.find((c) => cartLineKey(c) === cartLineKey(item));
+    const qtyBefore = inCart?.quantity || 0;
+    const qtyAfter = qtyBefore + quantity;
+    addToCart(item, quantity);
+    if (qtyAfter > qtyBefore) trackAddToCart(item, qtyAfter - qtyBefore, qtyBefore);
+    // Stay on the page: a small confirmation, the cart is one tap away.
+    setToast((prev) => ({ id: (prev?.id || 0) + 1, name: item.variant_label ? `${item.name} (${item.variant_label})` : item.name, quantity: qtyAfter - qtyBefore || quantity }));
   };
 
   const goBack = () => {
@@ -197,9 +225,11 @@ export default function DealDetail() {
   const comingSoon = isComingSoon(deal);
   const isBundle = isBundleDeal(deal);
   const packItems = bundleProducts(deal);
-  const unavailable = comingSoon || deal.stock <= 0 || deal.bundle_complete === false;
-  const buyLabel = comingSoon ? t("comingSoon") : deal.stock <= 0 ? t("soldOut") : t("addToCart");
-  const buyClass = comingSoon ? " coming-soon-btn" : deal.stock <= 0 ? " disabled-btn" : "";
+  // Only "coming soon" or a pack missing one of its items stops a purchase: stock never does.
+  const unavailable = comingSoon || deal.bundle_complete === false;
+  const buyLabel = comingSoon ? t("comingSoon") : deal.bundle_complete === false ? t("soldOut") : t("purchaseNow");
+  const qtyTotal = currentItem ? lineTotal({ ...currentItem, quantity }).total : null;
+  const buyClass = comingSoon ? " coming-soon-btn" : deal.bundle_complete === false ? " disabled-btn" : "";
 
   return (
     <>
@@ -241,24 +271,6 @@ export default function DealDetail() {
               </div>
             )}
 
-            {/* Specs Table */}
-            {(Array.isArray(deal.specs) && deal.specs.length > 0) && (
-              <div className="product-specs-section">
-                <h2 className="specs-title">{t("productSpecs")}</h2>
-                <table className="specs-table">
-                  <tbody>
-                    {deal.specs.map((row, i) => (
-                      row.label && (
-                        <tr key={i}>
-                          <td className="spec-label">{row.label}</td>
-                          <td className="spec-value">{row.value}</td>
-                        </tr>
-                      )
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            )}
           </div>
 
           <div className="detail-info">
@@ -275,6 +287,9 @@ export default function DealDetail() {
                 <span className="discount-badge-deal">-{dealDiscount(deal)}%</span>
               )}
             </div>
+            {Number(deal.oldPrice) > Number(deal.price) && (
+              <p className="you-save-line">{t("youSaveAmount", { amount: formatPrice(Number(deal.oldPrice) - Number(deal.price)) })}</p>
+            )}
 
             {isBundle && (
               <div className="bundle-detail-box">
@@ -299,10 +314,12 @@ export default function DealDetail() {
 
             {!isBundle && !unavailable && dealVariants.length > 0 && (
               <div className={`variant-picker${variantError ? ' has-error' : ''}`} ref={variantPickerRef}>
-                <h3 className="variant-picker-title">{t("chooseCableType")}</h3>
+                <h3 className="variant-picker-title">
+                  {t("chooseCableType")}
+                  {selectedVariant && <span className="variant-picker-selected"> · {t("selectedOption")}: <bdi>{variantLabel(selectedVariant)}</bdi></span>}
+                </h3>
                 <div className="variant-options" role="radiogroup" aria-label={t("cableType")}>
                   {dealVariants.map((v) => {
-                    const out = variantStock(deal, v) <= 0;
                     const selected = selectedVariant?.id === v.id;
                     return (
                       <button
@@ -310,13 +327,11 @@ export default function DealDetail() {
                         type="button"
                         role="radio"
                         aria-checked={selected}
-                        disabled={out}
-                        className={`variant-option${selected ? ' selected' : ''}${out ? ' out' : ''}`}
-                        onClick={() => { if (!out) { setSelectedVariantId(v.id); setVariantError(false); setCurrentImageIndex(0); } }}
+                        className={`variant-option${selected ? ' selected' : ''}`}
+                        onClick={() => { setSelectedVariantId(v.id); setVariantError(false); setCurrentImageIndex(0); }}
                       >
                         {variantImage(v) && <img src={variantImage(v)} alt="" className="variant-option-img" />}
                         <span className="variant-option-name" dir="ltr">{variantLabel(v)}</span>
-                        {out && <span className="variant-option-out">{t("variantOutOfStock")}</span>}
                         {selected && <span className="variant-option-check" aria-hidden="true">✓</span>}
                       </button>
                     );
@@ -331,7 +346,6 @@ export default function DealDetail() {
                 <h3 className="variant-picker-title">{t("chooseCableType")} — <bdi>{p.name}</bdi></h3>
                 <div className="variant-options" role="radiogroup" aria-label={t("cableType")}>
                   {p.variants.map((v) => {
-                    const out = Number(v.stock) <= 0;
                     const selected = String(packCables[bundleChoiceId(p)]) === String(v.id);
                     return (
                       <button
@@ -339,13 +353,11 @@ export default function DealDetail() {
                         type="button"
                         role="radio"
                         aria-checked={selected}
-                        disabled={out}
-                        className={`variant-option${selected ? ' selected' : ''}${out ? ' out' : ''}`}
-                        onClick={() => { if (!out) { setPackCables((prev) => ({ ...prev, [bundleChoiceId(p)]: v.id })); setPackCableError(false); } }}
+                        className={`variant-option${selected ? ' selected' : ''}`}
+                        onClick={() => { setPackCables((prev) => ({ ...prev, [bundleChoiceId(p)]: v.id })); setPackCableError(false); }}
                       >
                         {variantImage(v) && <img src={variantImage(v)} alt="" className="variant-option-img" />}
                         <span className="variant-option-name" dir="ltr">{variantLabel(v)}</span>
-                        {out && <span className="variant-option-out">{t("variantOutOfStock")}</span>}
                         {selected && <span className="variant-option-check" aria-hidden="true">✓</span>}
                       </button>
                     );
@@ -370,48 +382,38 @@ export default function DealDetail() {
               </div>
             )}
 
-              {deal.category && (
-                <div className="stock-info">
-                  <span className="category-badge">{deal.category}</span>
-                </div>
-              )}
-
               {comingSoon && <ComingSoonNotice />}
 
-              {!comingSoon && (deal.stock <= 0 || deal.bundle_complete === false) && (
+              {!comingSoon && deal.bundle_complete === false && (
                 <div className="stock-info">
                   <span className="sold-out-detail-badge">{t("soldOut")}</span>
                 </div>
               )}
 
-<div className="description-section">
-                <h3>{t("description")}</h3>
-                <p className="detail-description">{localized(deal.description) || t("noDescription")}</p>
+            {unavailable ? (
+              <div className="add-to-cart-row">
+                <button className={`detail-add-to-cart${buyClass}`} disabled>
+                  {buyLabel}
+                </button>
               </div>
+            ) : (
+              <BuyBox
+                quantity={quantity}
+                setQuantity={setQuantity}
+                qtyTotal={qtyTotal}
+                label={buyLabel}
+                onPurchase={handlePurchaseNow}
+                onAddToCart={handleAddToCart}
+                purchaseRef={purchaseRef}
+              />
+            )}
 
-            <div className="add-to-cart-row">
-              <button onClick={handleAddToCart} className={`detail-add-to-cart${buyClass}`} disabled={unavailable}>
-                {buyLabel}
-              </button>
-              <button onClick={goBack} className="detail-back-button">
-                {t("backToProducts")}
-              </button>
-            </div>
+            <p className="buy-reassure">🚚 {t("deliveryShort")} · 💵 {t("codShort")}</p>
 
-            <div className="reviews-section">
-              <h3>{t("reviews")}</h3>
-              {localized(deal.reviews) ? (
-                <div className="reviews-content deal-reviews">
-                  <p className="detail-reviews">{localized(deal.reviews)}</p>
-                </div>
-              ) : (
-                <div className="reviews-content add-review-placeholder">
-                  {t("noReviewsDeal")}
-                </div>
-              )}
-            </div>
           </div>
         </div>
+
+        <ProductInfoSections item={deal} noReviewsKey="noReviewsDeal" />
 
         {/* Gallery Info Images */}
         {Array.isArray(deal.gallery) && deal.gallery.length > 0 && (
@@ -450,7 +452,7 @@ export default function DealDetail() {
               {similarDeals.map((item) => (
                 <div
                   key={item.id}
-                  className={`similar-product-card${isComingSoon(item) ? ' coming-soon-card' : item.stock <= 0 ? ' sold-out-card' : ''}`}
+                  className={`similar-product-card${isComingSoon(item) ? ' coming-soon-card' : ''}`}
                   onClick={() => {
                     navigate(`/deal/${item.id}`);
                     window.scrollTo({ top: 0, behavior: 'smooth' });
@@ -462,11 +464,7 @@ export default function DealDetail() {
                     ) : (
                       <div className="image-placeholder">📦</div>
                     )}
-                    {isComingSoon(item) ? <ComingSoonOverlay compact /> : item.stock <= 0 && (
-                      <div className="sold-out-overlay">
-                        <span className="sold-out-badge">{t("soldOut")}</span>
-                      </div>
-                    )}
+                    {isComingSoon(item) && <ComingSoonOverlay compact />}
                   </div>
                   <div className="similar-product-info">
                     <h4>{item.name}</h4>
@@ -484,17 +482,18 @@ export default function DealDetail() {
     </div>
 
       {createPortal(
-        <div className={`sticky-bottom-bar ${footerVisible ? 'hidden' : ''}`}>
-          <button onClick={goBack} className="sticky-back-btn" aria-label={t("backToProducts")}>
-            ←
-          </button>
-          <span className="sticky-price" dir="ltr">{finalPrice} MAD</span>
-          <button onClick={handleAddToCart} className={`sticky-add-to-cart${buyClass}`} disabled={unavailable}>
+        <div className={`sticky-bottom-bar ${showSticky ? '' : 'hidden'}`}>
+          <span className="sticky-price" dir="ltr">
+            {qtyTotal !== null ? formatPrice(qtyTotal) : finalPrice} MAD
+            {quantity > 1 && !unavailable && <small className="sticky-qty">×{quantity}</small>}
+          </span>
+          <button onClick={handlePurchaseNow} className={`sticky-add-to-cart${buyClass}`} disabled={unavailable}>
             {buyLabel}
           </button>
         </div>,
         document.body
       )}
+      <CartToast toast={toast} onClose={closeToast} />
     </>
   );
 }

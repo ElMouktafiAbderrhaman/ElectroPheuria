@@ -39,6 +39,8 @@ Route::get('/deals.php', [ProductController::class, 'deals']);
 
 // Public: place an order (customer checkout)
 Route::post('/orders', [OrderController::class, 'store']);
+// Public: exact checkout amounts (offers + delivery) and stock check — nothing is saved
+Route::post('/orders/quote', [OrderController::class, 'quote'])->middleware('throttle:120,1');
 Route::post('/orders.php', [OrderController::class, 'store']);
 
 // ── Protected routes (admin dashboard – requires Sanctum token) ──
@@ -50,6 +52,8 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::put('/orders/{id}/status', [OrderController::class, 'updateStatus']);
     Route::get('/orders', [OrderController::class, 'index']);
     Route::get('/orders/history', [OrderController::class, 'history']);
+    // Units to prepare per product over pending + confirmed orders
+    Route::get('/orders/merchandise', [OrderController::class, 'merchandise']);
     Route::get('/stats', [OrderController::class, 'stats']);
     Route::get('/monthly-sales', [OrderController::class, 'monthlySales']);
 

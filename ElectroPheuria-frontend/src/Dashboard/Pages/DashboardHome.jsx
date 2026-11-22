@@ -1,23 +1,28 @@
 // src/pages/DashboardHome.jsx
 import { useState, useEffect } from "react";
+import { Link } from "react-router-dom";
 import api from '../../services/api.js';
 import "./DashboardHome.css";
+import "./PrepareProducts.css";
 
 export default function DashboardHome() {
   const [stats, setStats] = useState({});
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [recentOrders, setRecentOrders] = useState([]);
+  const [prep, setPrep] = useState(null);
 
   useEffect(() => {
     const fetchData = async () => {
       try {
         setLoading(true);
-        const [statsData, ordersData] = await Promise.all([
+        const [statsData, ordersData, merchandise] = await Promise.all([
           api.getStats(),
-          api.getOrders()
+          api.getOrders(),
+          api.getMerchandise().catch(() => null),
         ]);
         setStats(statsData);
+        setPrep(merchandise);
         setRecentOrders((Array.isArray(ordersData) ? ordersData : []).slice(0, 4)); // Recent 4
       } catch (err) {
         setError(err.message);
@@ -63,6 +68,19 @@ export default function DashboardHome() {
           </div>
         </div>
       </section>
+
+      {prep && (
+        <section className="dashboard-prep">
+          <Link to="/dashboard/prepare" className="dashboard-prep-card">
+            <span className="dashboard-prep-title">📦 Products to prepare</span>
+            <span className="dashboard-prep-value">{prep.total_units} units</span>
+            <span className="dashboard-prep-sub">
+              {prep.orders_count} order{prep.orders_count === 1 ? "" : "s"} awaiting fulfilment
+              {prep.items.length > 0 && ` · top: ${prep.items.slice(0, 3).map((i) => `${i.name} ×${i.total}`).join(", ")}`}
+            </span>
+          </Link>
+        </section>
+      )}
 
       <section className="dashboard-activity">
         <h2>Recent Activity</h2>

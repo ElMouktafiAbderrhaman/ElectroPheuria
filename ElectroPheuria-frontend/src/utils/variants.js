@@ -35,13 +35,6 @@ export const variantImage = (variant) => apiAssetUrl(variant?.image_url) || null
 export const variantLabel = (variant) =>
   variant?.label || VARIANT_TYPES.find((v) => v.type === variant?.type)?.label || variant?.type || "";
 
-/** Product is sold out: no variant in stock (variant products) or product stock is 0. */
-export const productSoldOut = (product) => {
-  const variants = activeVariants(product);
-  if (variants.length) return variants.every((v) => variantStock(product, v) <= 0);
-  return Number(product?.stock ?? 0) <= 0;
-};
-
 /** Lowest and highest price over the active variants, for "from X MAD" displays. */
 export const variantPriceRange = (product) => {
   const variants = activeVariants(product);
@@ -82,9 +75,9 @@ export const bundleCableItems = (deal) =>
 
 export const bundleNeedsCableChoice = (deal) => bundleCableItems(deal).length > 0;
 
-/** Every cable item of the pack has an in-stock cable chosen in `choices` ({choiceId: variantId}). */
+/** Every cable item of the pack has a cable chosen in `choices` ({choiceId: variantId}). */
 export const bundleChoicesComplete = (deal, choices) =>
-  bundleCableItems(deal).every((p) => p.variants.some((v) => String(v.id) === String(choices?.[bundleChoiceId(p)]) && Number(v.stock) > 0));
+  bundleCableItems(deal).every((p) => p.variants.some((v) => String(v.id) === String(choices?.[bundleChoiceId(p)])));
 
 /**
  * Cart line for a pack with the chosen cables: bundle_variants is sent to the server,

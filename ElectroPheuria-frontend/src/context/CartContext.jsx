@@ -2,6 +2,7 @@
 import { createContext, useContext, useState, useEffect, useCallback } from "react";
 import api from "../services/api";
 import { variantCartItem, bundleChoiceKey, bundleCartItem } from "../utils/variants";
+import { clampQuantity } from "../utils/quantity";
 
 const CartContext = createContext();
 
@@ -50,57 +51,31 @@ export function CartProvider({ children }) {
     }
   }, [cart]);
 
-  // ADD TO CART
+  // ADD TO CART — any quantity; stock never limits what a customer can order.
   const addToCart = (product, quantity = 1) => {
-    if (product.stock !== undefined && product.stock <= 0) {
-      return false;
-    }
-
     setCart((prev) => {
       const existing = prev.find((item) => matches(item, product));
 
       if (existing) {
         return prev.map((item) =>
           matches(item, product)
-            ? {
-                ...item,
-                quantity: Math.min(
-                  item.quantity + quantity,
-                  item.stock || 999
-                ),
-              }
+            ? { ...item, quantity: clampQuantity(item.quantity + quantity) }
             : item
         );
       }
 
-      return [
-        ...prev,
-        {
-          ...product,
-          quantity: Math.min(quantity, product.stock || 999),
-        },
-      ];
+      return [...prev, { ...product, quantity: clampQuantity(quantity) }];
     });
 
     return true;
   };
 
-  // UPDATE QUANTITY
+  // UPDATE QUANTITY — any whole number ≥ 1.
   const updateQuantity = (target, newQuantity) => {
     setCart((prev) =>
-      prev
-        .map((item) =>
-          matches(item, target)
-            ? {
-                ...item,
-                quantity: Math.max(
-                  1,
-                  Math.min(newQuantity, item.stock || 999)
-                ),
-              }
-            : item
-        )
-        .filter((item) => item.quantity > 0)
+      prev.map((item) =>
+        matches(item, target) ? { ...item, quantity: clampQuantity(newQuantity) } : item
+      )
     );
   };
 
