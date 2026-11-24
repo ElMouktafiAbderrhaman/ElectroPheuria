@@ -65,23 +65,25 @@ export function charmPrice(amount) {
 }
 
 /**
- * Line price for a cart item. Mirrors OfferPricing::line — every second unit of a
- * "buy 1, get the 2nd at 50% off" item is half price, then the line is rounded down
+ * Line price for a cart item. Mirrors OfferPricing::line — the offer applies ONCE per item:
+ * only the 2nd unit is discounted, every other unit is full price.
+ * "Buy 1, get the 2nd at 50% off": the 2nd unit is half price, then the line is rounded down
  * to a price ending in 9 (199 × 2 = 298.50 → 289). Single items are never rounded.
- * For "buy 1, get the 2nd for X MAD" every second unit costs exactly X (199 + 50 = 249).
+ * "Buy 1, get the 2nd for X MAD": the 2nd unit costs exactly X (100 + 50 = 150; 6 units = 550).
  * The server recomputes this from database prices; this is for display only.
  */
 export function lineTotal(item) {
   const unit = toNumber(item?.price) || 0;
   const qty = Math.max(1, parseInt(item?.quantity, 10) || 1);
   const subtotal = round2(unit * qty);
-  const pairs = Math.floor(qty / 2);
+  // The offer applies once: only the 2nd unit is discounted, the others are full price.
+  const offerApplies = qty >= 2;
   const second = secondItemPrice(item);
   let total = subtotal;
-  if (item?.offer_type === OFFER_BOGO_HALF && pairs > 0) {
-    total = charmPrice(subtotal - pairs * unit * 0.5);
-  } else if (isBogoFixedDeal(item) && pairs > 0 && second >= 0 && second < unit) {
-    total = subtotal - pairs * (unit - second);
+  if (item?.offer_type === OFFER_BOGO_HALF && offerApplies) {
+    total = charmPrice(subtotal - unit * 0.5);
+  } else if (isBogoFixedDeal(item) && offerApplies && second >= 0 && second < unit) {
+    total = subtotal - (unit - second);
   }
   return { subtotal, discount: round2(subtotal - total), total: round2(total) };
 }

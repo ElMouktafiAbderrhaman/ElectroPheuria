@@ -23,12 +23,13 @@ class OfferPricing
         $total = $subtotal;
 
         if ($offerType === self::BOGO_HALF && $quantity >= 2) {
-            // Every second unit of the same item is half price, then the line is rounded
-            // down to a price ending in 9 (199 × 2 = 298.50 → 289; 447.50 → 439).
-            $total = self::charmPrice($subtotal - intdiv($quantity, 2) * $unitPrice * 0.5);
+            // Only the 2nd unit is half price (once per item, whatever the quantity); every other
+            // unit is full price. The line is rounded down to a price ending in 9 (199 × 2 = 298.50 → 289).
+            $total = self::charmPrice($subtotal - $unitPrice * 0.5);
         } elseif ($offerType === self::BOGO_FIXED && $quantity >= 2 && $secondItemPrice !== null && $secondItemPrice < $unitPrice) {
-            // Every second unit costs exactly the price the admin entered (199 + 50 = 249), no rounding.
-            $total = $subtotal - intdiv($quantity, 2) * ($unitPrice - $secondItemPrice);
+            // Only the 2nd unit costs the price the admin entered (100 + 50 = 150; 6 units = 550),
+            // once per item whatever the quantity; no rounding.
+            $total = $subtotal - ($unitPrice - $secondItemPrice);
         }
 
         return [

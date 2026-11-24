@@ -164,8 +164,8 @@ class DealsAndOrdersTest extends TestCase
         Mail::fake();
         $deal = $this->makeDeal(['offer_type' => 'bogo_half', 'price' => 199, 'old_price' => 199]);
 
-        // 199, 298.50 → 289, 497.50 → 489, 597 → 589
-        foreach ([1 => 199.0, 2 => 289.0, 3 => 489.0, 4 => 589.0] as $qty => $expected) {
+        // Only the 2nd unit is half price (once): 199, 298.50 → 289, 497.50 → 489, 696.50 → 689, 1094.50 → 1089
+        foreach ([1 => 199.0, 2 => 289.0, 3 => 489.0, 4 => 689.0, 6 => 1089.0] as $qty => $expected) {
             // Client sends a bogus total and unit price; both must be ignored.
             $res = $this->order([['id' => $deal->id, 'name' => 'x', 'price' => 1, 'quantity' => $qty, 'isDeal' => true]], 1)
                 ->assertCreated();
@@ -176,6 +176,16 @@ class DealsAndOrdersTest extends TestCase
             $this->assertEquals(199 * $qty - $expected, $order->products[0]['offer_discount']);
             $this->assertSame('bogo_half', $order->products[0]['offer_type']);
         }
+    }
+
+    public function test_second_item_offer_applies_once_per_order(): void
+    {
+        // AirPods 4 at 100, 2nd for 50: 6 units = 100 + 50 + 4 × 100 = 550 (not 450).
+        $deal = $this->makeDeal(['offer_type' => 'bogo_fixed', 'price' => 100, 'old_price' => 100, 'second_item_price' => 50]);
+        $res = $this->order([['id' => $deal->id, 'name' => 'x', 'quantity' => 6, 'isDeal' => true]], 1)->assertCreated();
+        $order = Order::find($res->json('id'));
+        $this->assertEquals(550, (float) $order->subtotal);
+        $this->assertEquals(50, $order->products[0]['offer_discount']);
     }
 
     public function test_standard_deal_order_uses_database_price(): void
@@ -233,7 +243,8 @@ class DealsAndOrdersTest extends TestCase
         Mail::fake();
         $deal = $this->makeDeal(['offer_type' => 'bogo_fixed', 'price' => 199, 'old_price' => 199, 'second_item_price' => 50]);
 
-        foreach ([1 => 199.0, 2 => 249.0, 3 => 448.0, 4 => 498.0] as $qty => $expected) {
+        // Only the 2nd unit costs 50 (once): 199, 249, 448, 647, 1045
+        foreach ([1 => 199.0, 2 => 249.0, 3 => 448.0, 4 => 647.0, 6 => 1045.0] as $qty => $expected) {
             $res = $this->order([['id' => $deal->id, 'name' => 'x', 'price' => 1, 'quantity' => $qty, 'isDeal' => true]], 1)
                 ->assertCreated();
 

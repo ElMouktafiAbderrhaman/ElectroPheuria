@@ -372,7 +372,7 @@ export default function DealDetail() {
                 <strong className="bogo-detail-title">🎁 {offerLabel(deal, t)}</strong>
                 <p>{isBogoFixedDeal(deal) ? t("bogoFixedExplain", { price: formatPrice(deal.second_item_price) }) : t("bogoExplain")}</p>
                 <div className="bogo-detail-examples">
-                  {[2, 4].map((q) => (
+                  {[2, 3].map((q) => (
                     <span key={q}>
                       {q} × {formatPrice(deal.price)} = <s>{formatPrice(lineTotal({ ...deal, quantity: q }).subtotal)}</s>{" "}
                       <b>{formatPrice(lineTotal({ ...deal, quantity: q }).total)} MAD</b>
