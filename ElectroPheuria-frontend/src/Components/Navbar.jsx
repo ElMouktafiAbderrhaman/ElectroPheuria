@@ -6,6 +6,9 @@ import { useCart } from "../context/CartContext";
 import SearchIcon from "../icons/Search.svg";
 import CartIcon from "../icons/Cart.svg";
 import LanguageIcon from "../icons/Languages.svg";
+import LightModeIcon from "../icons/LightMode.svg";
+import DarkModeIcon from "../icons/DarkMode.svg";
+import { applyTheme, getStoredTheme, storeTheme } from "../utils/theme";
 import ElectroPheuriaLogo from "../assets/images/ElectroPheuriaLOGO.png";
 
 
@@ -84,12 +87,18 @@ const Navbar = () => {
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, [location.search]);
 
-  // Force black dark mode
+  // Colour theme: dark by default, light when chosen with the sun icon (remembered).
+  const [theme, setTheme] = useState(getStoredTheme);
   useEffect(() => {
-    document.body.style.backgroundColor = '#000000';
-    document.body.classList.remove('light-mode', 'dark-mode');
-    localStorage.removeItem('darkMode');
-  }, []);
+    applyTheme(theme);
+    // The navbar is not shown on the dashboard, which always stays dark.
+    return () => applyTheme("dark", "/dashboard");
+  }, [theme]);
+  const toggleTheme = () => {
+    const next = theme === "light" ? "dark" : "light";
+    storeTheme(next);
+    setTheme(next);
+  };
   
   // Cleanup debounce timer on unmount
   useEffect(() => {
@@ -263,6 +272,19 @@ const Navbar = () => {
               )}
             </div>
           </Link>
+
+          {/* Light / dark mode */}
+          <button
+            type="button"
+            className="nav-icon-btn theme-toggle"
+            onClick={toggleTheme}
+            aria-label={theme === "light" ? t("darkMode") : t("lightMode")}
+            title={theme === "light" ? t("darkMode") : t("lightMode")}
+            aria-pressed={theme === "light"}
+            data-testid="theme-toggle"
+          >
+            <img src={theme === "light" ? DarkModeIcon : LightModeIcon} alt="" className="nav-icon" />
+          </button>
 
           {/* Language Button */}
           <div 

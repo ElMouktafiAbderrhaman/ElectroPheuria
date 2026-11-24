@@ -1,0 +1,736 @@
+/*
+ * Light theme for the store (navbar sun / moon icon). Dark is the default and is untouched:
+ * every rule here only applies under body.light-mode, which is never set on /dashboard.
+ *
+ * Choices:
+ *  - Warm off-white pages, white cards with a thin gold border.
+ *  - Gold TEXT uses a deep gold (--lt-gold-ink) that is readable on white; gold BUTTONS keep
+ *    their bright gold background with dark text, exactly like in dark mode.
+ *  - Product photo frames stay black: the product photos are shot on black.
+ */
+body.light-mode {
+  --lt-page: #f7f5ef;
+  --lt-page-2: #efebe1;
+  --lt-card: #ffffff;
+  --lt-card-2: #fbfaf6;
+  --lt-text: #1a1a1a;
+  --lt-text-2: #45423c;
+  --lt-muted: #6b675e;
+  --lt-border: rgba(176, 138, 20, 0.28);
+  --lt-border-strong: rgba(176, 138, 20, 0.55);
+  --lt-gold-ink: #8a6a00;
+  --lt-shadow: 0 10px 30px rgba(60, 45, 10, 0.10);
+  --lt-red: #c0392b;
+  --lt-green: #1e8e4e;
+
+  background-color: var(--lt-page) !important;
+  color: var(--lt-text);
+}
+
+/* ───────── Navbar ───────── */
+body.light-mode .theme-toggle,
+.theme-toggle {
+  border: none;
+  padding: 0;
+}
+
+body.light-mode .search-container {
+  background: #ffffff;
+  border-color: var(--lt-border);
+}
+
+body.light-mode .search-input {
+  background: #ffffff;
+  color: var(--lt-text);
+}
+
+body.light-mode .mobile-menu {
+  background: linear-gradient(180deg, #ffffff 0%, #f7f5ef 100%);
+  border-color: var(--lt-border);
+  box-shadow: 0 16px 40px rgba(0, 0, 0, 0.12);
+}
+
+body.light-mode .mobile-menu-link {
+  color: var(--lt-text);
+}
+
+body.light-mode .mobile-menu-divider {
+  background: var(--lt-border);
+}
+
+body.light-mode .hamburger span {
+  background: var(--lt-gold-ink);
+}
+
+/* Bright yellow icons get a soft dark outline so they read on the white bar. */
+body.light-mode .nav-icon {
+  filter: drop-shadow(0 0 1px rgba(0, 0, 0, 0.45));
+}
+
+/* ───────── Shared page backgrounds ───────── */
+body.light-mode .home-container,
+body.light-mode .products-main,
+body.light-mode .product-detail-main,
+body.light-mode .cart-main,
+body.light-mode .checkout-main,
+body.light-mode .info-main,
+body.light-mode .deals,
+body.light-mode .categories,
+body.light-mode .features,
+body.light-mode .about {
+  background: var(--lt-page);
+  color: var(--lt-text);
+}
+
+body.light-mode .checkout-main::before,
+body.light-mode .product-detail-main::before,
+body.light-mode .products-main::before {
+  background: none;
+}
+
+body.light-mode .categories,
+body.light-mode .about {
+  background: var(--lt-page-2);
+}
+
+/* Section titles in the brand gold */
+body.light-mode .section-title,
+body.light-mode .deals h2,
+body.light-mode .categories h2,
+body.light-mode .features h2,
+body.light-mode .about h2,
+body.light-mode .similar-title,
+body.light-mode .gallery-section-title,
+body.light-mode .specs-title,
+body.light-mode .info-sections-title {
+  color: var(--lt-gold-ink);
+  -webkit-text-fill-color: var(--lt-gold-ink);
+  text-shadow: none;
+}
+
+/* ───────── Home ───────── */
+body.light-mode .home-container {
+  color: var(--lt-text);
+}
+
+body.light-mode .marquee-bar {
+  background: linear-gradient(90deg, #f3ecd8 0%, #fbf6e6 50%, #f3ecd8 100%);
+  color: var(--lt-gold-ink);
+  border-color: var(--lt-border);
+}
+
+body.light-mode .marquee-bar * {
+  color: var(--lt-gold-ink);
+}
+
+body.light-mode .see-more-deals,
+body.light-mode .feature-item {
+  background: var(--lt-card);
+  border-color: var(--lt-border);
+  box-shadow: var(--lt-shadow);
+}
+
+body.light-mode .feature-item:hover {
+  background: #fffaf0;
+}
+
+body.light-mode .feature-content h4,
+body.light-mode .feature-item:hover .feature-content p {
+  color: var(--lt-text);
+}
+
+body.light-mode .feature-content p {
+  color: var(--lt-text-2);
+}
+
+body.light-mode .about p,
+body.light-mode .about li,
+body.light-mode .categories p,
+body.light-mode .deals p.section-subtitle,
+body.light-mode .section-subtitle {
+  color: var(--lt-text-2);
+}
+
+body.light-mode .empty-deals {
+  color: var(--lt-text-2);
+}
+
+/* ───────── Product / deal cards (home, products, similar) ───────── */
+body.light-mode .product-card,
+body.light-mode .deals-grid .product-card,
+body.light-mode .similar-product-card {
+  background: var(--lt-card);
+  border-color: var(--lt-border);
+  box-shadow: var(--lt-shadow);
+}
+
+body.light-mode .product-card.golden-card,
+body.light-mode .deals-grid .product-card.golden-card {
+  background: linear-gradient(160deg, #fffaf0 0%, #ffffff 60%);
+  border-color: var(--lt-border-strong);
+}
+
+body.light-mode .product-info h4,
+body.light-mode .similar-product-info h4 {
+  color: var(--lt-text);
+}
+
+body.light-mode .product-info .price,
+body.light-mode .product-card .price,
+body.light-mode .deal-price,
+body.light-mode .similar-product-price {
+  color: var(--lt-gold-ink);
+  -webkit-text-fill-color: var(--lt-gold-ink);
+  text-shadow: none;
+}
+
+body.light-mode .click-details-tag {
+  color: var(--lt-gold-ink);
+}
+
+body.light-mode .bundle-card .bundle-names {
+  color: var(--lt-text-2);
+}
+
+body.light-mode .bundle-card .bundle-names-plus,
+body.light-mode .bundle-card .bundle-both {
+  color: var(--lt-gold-ink);
+}
+
+body.light-mode .category-button {
+  color: var(--lt-text);
+  background: var(--lt-card);
+  border-color: var(--lt-border);
+}
+
+body.light-mode .category-button:hover,
+body.light-mode .category-button.active {
+  color: #111;
+}
+
+body.light-mode .variant-chip {
+  background: #ffffff;
+  color: var(--lt-text);
+  border-color: var(--lt-border);
+}
+
+body.light-mode .variant-chip.selected {
+  color: var(--lt-gold-ink);
+  border-color: var(--lt-gold-ink);
+  background: #fff6dc;
+}
+
+/* ───────── Product & deal detail ───────── */
+body.light-mode .detail-info {
+  background: var(--lt-card);
+  border-color: var(--lt-border);
+  box-shadow: var(--lt-shadow);
+  backdrop-filter: none;
+}
+
+body.light-mode .product-title {
+  color: var(--lt-text);
+  -webkit-text-fill-color: var(--lt-text);
+  text-shadow: none;
+}
+
+body.light-mode .detail-price,
+body.light-mode .detail-price-deal,
+body.light-mode .sticky-price {
+  color: var(--lt-gold-ink);
+  -webkit-text-fill-color: var(--lt-gold-ink);
+  text-shadow: none;
+}
+
+body.light-mode .price-section-deal {
+  background: #fffaf0;
+  border-color: var(--lt-border);
+}
+
+body.light-mode .old-price-deal,
+body.light-mode .similar-old-price {
+  color: var(--lt-red) !important;
+  text-decoration-color: var(--lt-red);
+}
+
+body.light-mode .you-save-line {
+  color: var(--lt-green);
+}
+
+body.light-mode .bogo-unit {
+  color: var(--lt-muted);
+}
+
+body.light-mode .detail-description,
+body.light-mode .detail-reviews,
+body.light-mode .deal-reviews {
+  color: var(--lt-text-2) !important;
+}
+
+body.light-mode .description-section h3,
+body.light-mode .reviews-section h3 {
+  color: var(--lt-text);
+}
+
+body.light-mode .bogo-detail-box,
+body.light-mode .bundle-detail-box {
+  background: linear-gradient(135deg, #fff6dc 0%, #ffffff 100%);
+  border-color: var(--lt-border-strong);
+}
+
+body.light-mode .bogo-detail-box p,
+body.light-mode .bogo-detail-examples,
+body.light-mode .bundle-detail-name {
+  color: var(--lt-text-2);
+}
+
+body.light-mode .bogo-detail-title,
+body.light-mode .bundle-detail-title,
+body.light-mode .bundle-detail-pack b,
+body.light-mode .bogo-detail-examples b {
+  color: var(--lt-gold-ink);
+}
+
+body.light-mode .bundle-detail-item {
+  background: #ffffff;
+  border-color: var(--lt-border);
+}
+
+body.light-mode .specs-table {
+  background: var(--lt-card);
+  border-color: var(--lt-border);
+}
+
+body.light-mode .spec-label {
+  color: var(--lt-gold-ink);
+  background: #fbf6e6;
+}
+
+body.light-mode .spec-value {
+  color: var(--lt-text);
+}
+
+body.light-mode .specs-table td {
+  border-color: var(--lt-border);
+}
+
+body.light-mode .gallery-paragraph p {
+  color: var(--lt-text-2);
+}
+
+body.light-mode .similar-subtitle,
+body.light-mode .product-detail-empty {
+  color: var(--lt-text-2);
+}
+
+body.light-mode .thumbnail {
+  border-color: var(--lt-border);
+}
+
+/* Cable options */
+body.light-mode .variant-picker {
+  background: #fffdf7;
+  border-color: var(--lt-border);
+}
+
+body.light-mode .variant-picker-title,
+body.light-mode .variant-picker-selected,
+body.light-mode .variant-option-price {
+  color: var(--lt-gold-ink);
+}
+
+body.light-mode .variant-option {
+  background: #ffffff;
+  color: var(--lt-text);
+  border-color: var(--lt-border);
+}
+
+body.light-mode .variant-option.selected {
+  background: #fff6dc;
+  border-color: var(--lt-gold-ink);
+}
+
+body.light-mode .variant-error {
+  color: var(--lt-red);
+}
+
+/* Buy box */
+body.light-mode .buy-box {
+  background: #fffdf7;
+  border-color: var(--lt-border);
+}
+
+body.light-mode .buy-box-total {
+  color: var(--lt-text-2);
+}
+
+body.light-mode .add-to-cart-secondary {
+  color: var(--lt-gold-ink);
+  border-color: var(--lt-gold-ink);
+}
+
+body.light-mode .add-to-cart-secondary:hover {
+  background: #fff6dc;
+  color: var(--lt-gold-ink);
+}
+
+body.light-mode .buy-reassure,
+body.light-mode .delivery-promise {
+  color: var(--lt-text-2);
+}
+
+body.light-mode .delivery-promise {
+  background: #ffffff;
+  border-color: var(--lt-border-strong);
+}
+
+body.light-mode .delivery-promise strong {
+  color: var(--lt-text);
+}
+
+/* Quantity selector */
+body.light-mode .qty-label {
+  color: var(--lt-muted);
+}
+
+body.light-mode .qty-control {
+  background: #ffffff;
+  border-color: var(--lt-border-strong);
+}
+
+body.light-mode .qty-btn {
+  background: #fbf3da;
+  color: var(--lt-gold-ink);
+}
+
+body.light-mode .qty-btn:hover:not(:disabled) {
+  background: #f3e3b0;
+}
+
+body.light-mode .qty-input {
+  color: var(--lt-text);
+}
+
+/* Details sections */
+body.light-mode .info-section {
+  background: #ffffff;
+  border-color: var(--lt-border);
+}
+
+body.light-mode .info-section > summary {
+  color: var(--lt-text);
+}
+
+body.light-mode .info-chevron {
+  color: var(--lt-gold-ink);
+}
+
+body.light-mode .info-text {
+  color: var(--lt-text-2);
+}
+
+body.light-mode .info-faq-q {
+  color: var(--lt-text);
+}
+
+/* Sticky purchase bar (phones) */
+body.light-mode .sticky-bottom-bar {
+  background: rgba(255, 255, 255, 0.97);
+  border-top-color: var(--lt-border-strong);
+  box-shadow: 0 -8px 30px rgba(60, 45, 10, 0.14);
+}
+
+body.light-mode .sticky-qty {
+  color: var(--lt-muted);
+}
+
+/* "Added to cart" toast */
+body.light-mode .cart-toast {
+  background: #ffffff;
+  color: var(--lt-text);
+  border-color: rgba(30, 142, 78, 0.5);
+  box-shadow: 0 16px 40px rgba(0, 0, 0, 0.16);
+}
+
+body.light-mode .cart-toast-text {
+  color: var(--lt-text-2);
+}
+
+body.light-mode .cart-toast-text strong {
+  color: var(--lt-text);
+}
+
+/* Coming soon */
+body.light-mode .coming-soon-notice p {
+  color: var(--lt-text-2);
+}
+
+/* ───────── Cart ───────── */
+body.light-mode .cart-item {
+  background: var(--lt-card);
+  border-color: var(--lt-border);
+  box-shadow: var(--lt-shadow);
+}
+
+body.light-mode .item-details h4,
+body.light-mode .cart-total p {
+  color: var(--lt-text);
+}
+
+body.light-mode .item-price,
+body.light-mode .total-amount,
+body.light-mode .cart-grand-total span {
+  color: var(--lt-gold-ink);
+  -webkit-text-fill-color: var(--lt-gold-ink);
+  text-shadow: none;
+}
+
+body.light-mode .item-price-single,
+body.light-mode .cart-total p.cart-breakdown,
+body.light-mode .empty-cart p {
+  color: var(--lt-text-2);
+}
+
+body.light-mode .cart-total {
+  background: var(--lt-card);
+  border-color: var(--lt-border);
+}
+
+body.light-mode .line-variant-tag,
+body.light-mode .line-bundle-tag {
+  color: var(--lt-gold-ink);
+}
+
+/* ───────── Checkout ───────── */
+body.light-mode .checkout-step,
+body.light-mode .checkout-success,
+body.light-mode .checkout-state {
+  background: var(--lt-card);
+  border-color: var(--lt-border);
+  box-shadow: var(--lt-shadow);
+  color: var(--lt-text);
+}
+
+body.light-mode .checkout-step-title,
+body.light-mode .checkout-flow .order-summary h3.checkout-step-title,
+body.light-mode .checkout-field-label {
+  color: var(--lt-gold-ink);
+}
+
+body.light-mode .checkout-back-link {
+  color: var(--lt-text-2);
+}
+
+body.light-mode .checkout-input {
+  background: #ffffff;
+  color: var(--lt-text);
+  border-color: rgba(120, 100, 40, 0.35);
+}
+
+body.light-mode .checkout-input::placeholder {
+  color: #8a857a;
+}
+
+body.light-mode .checkout-input:focus {
+  border-color: var(--lt-gold-ink);
+  box-shadow: 0 0 0 3px rgba(176, 138, 20, 0.18);
+}
+
+body.light-mode .required-note,
+body.light-mode .field-help,
+body.light-mode .summary-count,
+body.light-mode .pay-note,
+body.light-mode .success-next,
+body.light-mode .summary-line-amounts,
+body.light-mode .lf-per {
+  color: var(--lt-muted);
+}
+
+body.light-mode .error-hint,
+body.light-mode .checkout-message {
+  color: var(--lt-red);
+}
+
+body.light-mode .city-select-list {
+  background: #ffffff;
+  border-color: var(--lt-border-strong);
+  box-shadow: 0 16px 40px rgba(0, 0, 0, 0.14);
+}
+
+body.light-mode .city-select-option {
+  color: var(--lt-text);
+}
+
+body.light-mode .city-select-option:hover,
+body.light-mode .city-select-option.active,
+body.light-mode .city-select-option[aria-selected="true"] {
+  background: #fff6dc;
+}
+
+body.light-mode .summary-details h4,
+body.light-mode .summary-name-row h4 {
+  color: var(--lt-text);
+}
+
+body.light-mode .summary-item {
+  border-bottom-color: rgba(0, 0, 0, 0.08);
+}
+
+body.light-mode .summary-line-amounts strong {
+  color: var(--lt-gold-ink);
+}
+
+body.light-mode .summary-offer-tag {
+  color: var(--lt-gold-ink);
+}
+
+body.light-mode .summary-table td {
+  color: var(--lt-text);
+  border-top-color: rgba(0, 0, 0, 0.08);
+}
+
+body.light-mode .st-qty,
+body.light-mode .st-variant {
+  color: var(--lt-muted);
+}
+
+body.light-mode .st-discount .st-amount {
+  color: var(--lt-green);
+}
+
+body.light-mode .summary-table .st-total td {
+  background: #fff6dc;
+  border-top-color: var(--lt-gold-ink);
+  color: var(--lt-gold-ink);
+}
+
+body.light-mode .checkout-success h2 {
+  color: var(--lt-text);
+}
+
+body.light-mode .checkout-success .success-ref strong {
+  color: var(--lt-gold-ink);
+}
+
+body.light-mode .checkout-notice {
+  color: #8a5a00;
+  background: #fff3d6;
+}
+
+/* ───────── Info pages (FAQ, delivery, returns…) ───────── */
+body.light-mode .info-card,
+body.light-mode .info-content-box {
+  background: var(--lt-card);
+  border-color: var(--lt-border);
+  box-shadow: var(--lt-shadow);
+  color: var(--lt-text);
+}
+
+body.light-mode .info-content-box p,
+body.light-mode .info-content-box li,
+body.light-mode .info-card p {
+  color: var(--lt-text-2);
+}
+
+body.light-mode .info-content-box h2,
+body.light-mode .info-content-box h3,
+body.light-mode .info-card h3 {
+  color: var(--lt-gold-ink);
+}
+
+/* ───────── Footer ───────── */
+body.light-mode .footer {
+  background: linear-gradient(180deg, #f1ece0 0%, #e8e1d0 100%);
+  color: var(--lt-text);
+  border-top-color: var(--lt-border-strong);
+}
+
+body.light-mode .footer p,
+body.light-mode .footer li,
+body.light-mode .footer a,
+body.light-mode .footer span {
+  color: var(--lt-text-2);
+}
+
+body.light-mode .footer h3,
+body.light-mode .footer h4 {
+  color: var(--lt-gold-ink);
+  -webkit-text-fill-color: var(--lt-gold-ink);
+}
+
+body.light-mode .footer a:hover {
+  color: var(--lt-gold-ink);
+}
+
+body.light-mode .social-name {
+  background: #ffffff;
+  color: var(--lt-text);
+}
+
+/* ───────── Gold text, readable on white (generated from the gold rules of the store CSS) ───────── */
+body.light-mode .language-option.active,
+body.light-mode .language-check,
+body.light-mode .see-more-icon,
+body.light-mode .deals-grid .click-details-tag,
+body.light-mode .deals-grid .deal-prices-stacked .new-price,
+body.light-mode .deal-new-price,
+body.light-mode .about-text strong,
+body.light-mode .search-indicator,
+body.light-mode .click-details-tag,
+body.light-mode .deal-prices-stacked .new-price,
+body.light-mode .new-price,
+body.light-mode .category-tag,
+body.light-mode .clear-filters,
+body.light-mode .deal-save,
+body.light-mode .bogo-tag,
+body.light-mode .cart-offer-tag,
+body.light-mode .footer-bottom a,
+body.light-mode .coming-soon-notice strong,
+body.light-mode .info-card h4,
+body.light-mode .quantity,
+body.light-mode .cart-qty-words,
+body.light-mode .spec-price,
+body.light-mode .order-summary h3,
+body.light-mode .delivery-info h4,
+body.light-mode .checkout-form-section h3,
+body.light-mode .city-select-check,
+body.light-mode .city-select-option.selected .city-select-name,
+body.light-mode .pay-recap-total strong,
+body.light-mode .summary-qty-x,
+body.light-mode .lf-qty dd,
+body.light-mode .pb-row-total > span,
+body.light-mode .pb-row-total strong,
+body.light-mode .pay-recap-check {
+  color: var(--lt-gold-ink);
+  -webkit-text-fill-color: var(--lt-gold-ink);
+  text-shadow: none;
+}
+
+/* Gold gradient headings and the logo: same shine, deeper gold. */
+body.light-mode .logo a,
+body.light-mode .section-header h2,
+body.light-mode .products-header h2,
+body.light-mode .footer-logo,
+body.light-mode .footer-links h4,
+body.light-mode .footer-service h4,
+body.light-mode .footer-contact h4,
+body.light-mode .footer-social h4,
+body.light-mode .info-title,
+body.light-mode .cart-header h2,
+body.light-mode .empty-cart h2,
+body.light-mode .checkout-header h2 {
+  background: linear-gradient(135deg, #7a5c00 0%, #b8860b 50%, #8a6a00 100%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+  color: var(--lt-gold-ink);
+  text-shadow: none;
+  filter: none;
+}
+
+/* The logo image has white lettering: a thin dark outline makes it readable on cream
+   (no background box: the image relies on its transparent padding for layout). */
+body.light-mode .about-image img,
+body.light-mode .footer-logo-img {
+  filter: drop-shadow(0 0 0.7px rgba(0, 0, 0, 0.95)) drop-shadow(0 0 0.7px rgba(0, 0, 0, 0.95)) drop-shadow(0 2px 3px rgba(0, 0, 0, 0.25));
+}
