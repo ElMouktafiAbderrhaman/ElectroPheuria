@@ -274,4 +274,49 @@ class PurchaseFlowTest extends TestCase
     {
         $this->getJson('/api/orders/merchandise')->assertUnauthorized();
     }
+
+    // ───────────── "On route" status ─────────────
+
+    public function test_order_moves_through_on_route_before_shipped(): void
+    {
+        $p = $this->product(['stock' => 10]);
+        $id = $this->order([['id' => $p->id, 'quantity' => 3]])->assertCreated()->json('id');
+        Sanctum::actingAs(User::factory()->create());
+
+        $this->putJson("/api/orders/{$id}/status", ['status' => 'ongoing'])->assertOk();
+        $this->putJson("/api/orders/{$id}/status", ['status' => 'on_route'])
+            ->assertOk()->assertJsonPath('status', 'on_route');
+
+        // Out with the courier: already prepared, not yet a sale.
+        $this->assertSame([], $this->merchandise()['items']);
+        $stats = $this->getJson('/api/stats')->assertOk()->json();
+        $this->assertSame(1, $stats['on_route']);
+        $this->assertSame(0, $stats['shipped']);
+
+        $this->putJson("/api/orders/{$id}/status", ['status' => 'shipped'])->assertOk();
+        $this->assertSame('shipped', Order::find($id)->status);
+        $this->assertSame(7, $p->fresh()->stock);
+    }
+
+    public function test_cancelling_an_on_route_order_restores_stock(): void
+    {
+        $p = $this->product(['stock' => 10]);
+        $id = $this->order([['id' => $p->id, 'quantity' => 4]])->json('id');
+        Sanctum::actingAs(User::factory()->create());
+
+        $this->putJson("/api/orders/{$id}/status", ['status' => 'on_route'])->assertOk();
+        $this->assertSame(6, $p->fresh()->stock);
+
+        $this->putJson("/api/orders/{$id}/status", ['status' => 'cancelled'])->assertOk();
+        $this->assertSame(10, $p->fresh()->stock);
+    }
+
+    public function test_unknown_status_is_rejected(): void
+    {
+        $p = $this->product();
+        $id = $this->order([['id' => $p->id, 'quantity' => 1]])->json('id');
+        Sanctum::actingAs(User::factory()->create());
+
+        $this->putJson("/api/orders/{$id}/status", ['status' => 'on-the-moon'])->assertUnprocessable();
+    }
 }

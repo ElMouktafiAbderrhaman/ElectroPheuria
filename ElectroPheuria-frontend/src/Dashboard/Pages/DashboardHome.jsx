@@ -54,7 +54,7 @@ export default function DashboardHome() {
           <div className="stat-card">
             <h3>Pending Orders</h3>
             <p className="stat-number">{stats.pending || 0}</p>
-            <span className="stat-change neutral">{stats.ongoing || 0} ongoing · {stats.shipped || 0} shipped</span>
+            <span className="stat-change neutral">{stats.ongoing || 0} ongoing · {stats.on_route || 0} on route · {stats.shipped || 0} shipped</span>
           </div>
           <div className="stat-card">
             <h3>Customers</h3>

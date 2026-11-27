@@ -383,7 +383,7 @@ class OrderController extends Controller
     public function updateStatus(Request $request, $id)
     {
         $request->validate([
-            'status' => 'required|in:ongoing,done,cancelled,shipped,refunded',
+            'status' => 'required|in:ongoing,on_route,done,cancelled,shipped,refunded',
         ]);
 
         $order = Order::findOrFail($id);
@@ -587,6 +587,7 @@ class OrderController extends Controller
         $total = Order::count();
         $pending = Order::where('status', 'pending')->count();
         $ongoing = Order::where('status', 'ongoing')->count();
+        $onRoute = Order::where('status', 'on_route')->count();
         $done = Order::where('status', 'done')->count();
         $shipped = Order::where('status', 'shipped')->count();
         $cancelled = Order::where('status', 'cancelled')->count();
@@ -607,6 +608,7 @@ class OrderController extends Controller
             'total' => $total,
             'pending' => $pending,
             'ongoing' => $ongoing,
+            'on_route' => $onRoute,
             'done' => $done,
             'shipped' => $shipped,
             'cancelled' => $cancelled,

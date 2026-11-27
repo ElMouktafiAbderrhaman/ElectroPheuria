@@ -18,7 +18,7 @@ class FinanceLedger
 {
     /** Orders whose money is due: shipped (or marked delivered) and not yet recorded as received. */
     public const EXPECTED_STATUSES = ['shipped', 'done'];
-    public const PIPELINE_STATUSES = ['pending', 'ongoing'];
+    public const PIPELINE_STATUSES = ['pending', 'ongoing', 'on_route'];
 
     /** Balances after every movement (optionally ignoring one, e.g. the one being edited). */
     public static function balances(?FinanceSetting $settings = null, ?int $exceptId = null): array
@@ -131,7 +131,7 @@ class FinanceLedger
         return [
             // Shipped / delivered, cash not recorded as received yet.
             'expected' => ['total' => round((float) $expected->sum('total_price'), 2), 'count' => $expected->count(), 'orders' => $expected->map($row)->values()->all()],
-            // Confirmed or new orders that are not shipped yet.
+            // New, confirmed or on-route orders that are not shipped yet.
             'pipeline' => ['total' => round((float) $pipeline->sum('total_price'), 2), 'count' => $pipeline->count()],
             // Orders an income movement can still be linked to (incl. already-linked ones for editing).
             'linkable' => $due->map($row)->values()->all(),

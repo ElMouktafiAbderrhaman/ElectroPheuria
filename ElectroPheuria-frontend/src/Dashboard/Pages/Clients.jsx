@@ -30,6 +30,7 @@ export default function Clients() {
       case "pending": return "status-pending";
       case "done": return "status-delivered";
       case "ongoing": return "status-processing";
+      case "on_route": return "status-on-route";
       case "cancelled": return "status-cancelled";
       default: return "";
     }

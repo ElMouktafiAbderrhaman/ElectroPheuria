@@ -47,12 +47,32 @@ function OrderLine({ p }) {
   );
 }
 
+/** What each status button does, shown in the confirmation popup before anything is sent. */
+const STATUS_ACTIONS = {
+  ongoing:   { label: "Confirm",  btn: "confirm-btn", title: "Confirm Order",    text: "will be confirmed." },
+  on_route:  { label: "On Route", btn: "route-btn",   title: "Mark On Route",    text: "will be marked as on route (out with the courier)." },
+  shipped:   { label: "Shipped",  btn: "ship-btn",    title: "Mark Shipped",     text: "will be marked as shipped (delivered and paid)." },
+  cancelled: { label: "Cancel",   btn: "cancel-btn",  title: "Cancel Order",     text: "will be cancelled and its stock will be restored." },
+  refunded:  { label: "Refund",   btn: "refund-btn",  title: "Confirm Refund",   text: "will be refunded and its stock will be restored." },
+};
+
+/** Buttons offered for each current status, in workflow order. */
+const NEXT_STATUSES = {
+  pending:  ["ongoing", "cancelled"],
+  ongoing:  ["on_route", "cancelled"],
+  on_route: ["shipped", "cancelled"],
+  shipped:  ["refunded"],
+};
+
+const statusLabel = (status) => (status === "on_route" ? "on route" : status);
+
 export default function Orders() {
   const [orders, setOrders] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [searchId, setSearchId] = useState("");
-  const [confirmRefund, setConfirmRefund] = useState(null);
+  // Status change waiting for confirmation in the popup: { order, status }.
+  const [pendingChange, setPendingChange] = useState(null);
   const [copiedId, setCopiedId] = useState(null);
 
   const handleCopyAddress = async (order) => {
@@ -63,7 +83,7 @@ export default function Orders() {
     }
   };
 
-  const statusOrder = { pending: 0, ongoing: 1, shipped: 2, done: 3, refunded: 4, cancelled: 5 };
+  const statusOrder = { pending: 0, ongoing: 1, on_route: 2, shipped: 3, done: 4, refunded: 5, cancelled: 6 };
 
   const activeOrders = orders
     .filter(o => !['done', 'cancelled', 'refunded'].includes(o.status))
@@ -91,6 +111,7 @@ export default function Orders() {
       case "pending": return "status-pending";
       case "done": return "status-delivered";
       case "ongoing": return "status-processing";
+      case "on_route": return "status-on-route";
       case "cancelled": return "status-cancelled";
       case "refunded": return "status-refunded";
       default: return "";
@@ -105,8 +126,8 @@ export default function Orders() {
       ));
       window.dispatchEvent(new Event("ordersUpdated"));
 
-      // Refresh products & deals stock after cancellation
-      if (newStatus === 'cancelled') {
+      // Refresh products & deals stock after cancellation / refund (stock was restored)
+      if (newStatus === 'cancelled' || newStatus === 'refunded') {
         try {
           const [products, deals] = await Promise.all([
             api.getProducts(),
@@ -146,18 +167,37 @@ export default function Orders() {
         </div>
       </div>
 
-      {confirmRefund && (
-        <div className="refund-overlay" onClick={() => setConfirmRefund(null)}>
-          <div className="refund-modal" onClick={(e) => e.stopPropagation()}>
-            <h3>Confirm Refund</h3>
-            <p>Are you sure about submitting this action? Order <strong>#{confirmRefund}</strong> will be refunded and stock will be restored.</p>
-            <div className="refund-modal-actions">
-              <button className="action-btn cancel-btn" onClick={() => setConfirmRefund(null)}>Cancel</button>
-              <button className="action-btn refund-btn" onClick={() => { handleStatusChange(confirmRefund, "refunded"); setConfirmRefund(null); }}>Yes, Refund</button>
+      {pendingChange && (() => {
+        const action = STATUS_ACTIONS[pendingChange.status];
+        const { order } = pendingChange;
+        const customer = order.client_data?.name || order.client?.name;
+        return (
+          <div className="refund-overlay" onClick={() => setPendingChange(null)}>
+            <div className="refund-modal" onClick={(e) => e.stopPropagation()}>
+              <h3>{action.title}</h3>
+              <p>
+                Are you sure about submitting this action? Order <strong>#{order.id}</strong>
+                {customer && <> ({customer})</>} {action.text}
+              </p>
+              <p className="status-change-path">
+                <span className={`status-badge ${getStatusColor(order.status)}`}>{statusLabel(order.status)}</span>
+                {" → "}
+                <span className={`status-badge ${getStatusColor(pendingChange.status)}`}>{statusLabel(pendingChange.status)}</span>
+              </p>
+              <div className="refund-modal-actions">
+                <button className="action-btn" onClick={() => setPendingChange(null)}>Go back</button>
+                <button
+                  className={`action-btn ${action.btn}`}
+                  autoFocus
+                  onClick={() => { handleStatusChange(order.id, pendingChange.status); setPendingChange(null); }}
+                >
+                  Yes, {action.label}
+                </button>
+              </div>
             </div>
           </div>
-        </div>
-      )}
+        );
+      })()}
 
       <div className="orders-table-container">
         <table className="orders-table">
@@ -208,7 +248,7 @@ export default function Orders() {
                 <td>{order?.created_at ? new Date(order.created_at).toLocaleDateString() : (order?.date || "N/A")}</td>
                 <td>
                   <span className={`status-badge ${getStatusColor(order?.status)}`}>
-                    {order?.status || "N/A"}
+                    {order?.status ? statusLabel(order.status) : "N/A"}
                   </span>
                 </td>
                 <td className="total-amount">
@@ -220,25 +260,16 @@ export default function Orders() {
                   )}
                 </td>
                 <td className="order-actions">
-                  {order.status === "pending" && (
-                    <>
-                      <button className="action-btn confirm-btn" onClick={() => handleStatusChange(order.id, "ongoing")}>Confirm</button>
-                      <button className="action-btn cancel-btn" onClick={() => handleStatusChange(order.id, "cancelled")}>Cancel</button>
-                    </>
-                  )}
-                  {order.status === "ongoing" && (
-                    <>
-                      <button className="action-btn ship-btn" onClick={() => handleStatusChange(order.id, "shipped")}>Shipped</button>
-                      <button className="action-btn cancel-btn" onClick={() => handleStatusChange(order.id, "cancelled")}>Cancel</button>
-                    </>
-                  )}
-                  {order.status === "shipped" && (
-                    <button className="action-btn refund-btn" onClick={() => setConfirmRefund(order.id)}>Refund</button>
-                  )}
-                  {order.status === "refunded" && (
-                    <span className="status-final">refunded</span>
-                  )}
-                  {(order.status === "done" || order.status === "cancelled") && (
+                  {(NEXT_STATUSES[order.status] || []).map((status) => (
+                    <button
+                      key={status}
+                      className={`action-btn ${STATUS_ACTIONS[status].btn}`}
+                      onClick={() => setPendingChange({ order, status })}
+                    >
+                      {STATUS_ACTIONS[status].label}
+                    </button>
+                  ))}
+                  {["done", "cancelled", "refunded"].includes(order.status) && (
                     <span className="status-final">{order.status}</span>
                   )}
                 </td>
